@@ -1,26 +1,30 @@
-import { RenderSystem } from './core/RenderSystem.js';
+import { InputSystem } from './core/InputSystem.js';
+import { RenderGroup, RenderSystem } from './core/RenderSystem.js';
+import { UiSystem } from './core/UiSystem.js';
 import * as constants from './data/constants.js';
-import {Inputs} from './data/inputs.js';
+import {State, Trigger} from './data/inputs.js';
+import type { Sprite } from './data/sprites.js';
 
 export class Game {
     canvas: HTMLCanvasElement;
-    inputMapping: Map<Inputs, (() => void)[]>;
 
     renderSystem: RenderSystem;
+    inputSystem: InputSystem;
+    uiSystem: UiSystem;
+
+    paused = false;
 
     constructor() {
         this.canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
 
         this.renderSystem = new RenderSystem(this.canvas);
-        this.inputMapping = new Map();
-        for (const key of Object.keys(Inputs) as (keyof typeof Inputs)[]) {
-            const input = Inputs[key];
-            this.inputMapping.set(input, []);
-        }
+        this.inputSystem = new InputSystem();
+        this.uiSystem = new UiSystem(this);
 
         this.setupCanvas();
-        this.setupInputs();
-        this.setupUI();
+
+        this.setupTestSprite();
+        this.gameLoop();
     }
     setupCanvas = () => {
         
@@ -28,62 +32,69 @@ export class Game {
         this.canvas.height = constants.CANVAS_HEIGHT;
         
         const onResize = (): void => {
-            let w, h;
-            const [width, height] = [window.innerWidth, window.innerHeight];
-            const aspectRatio = width / height;
-            if (aspectRatio > constants.CANVAS_ASPECT_RATIO) {
-                [w, h] = [height * constants.CANVAS_ASPECT_RATIO, height];
-            } else {
-                [w, h] = [width, width / constants.CANVAS_ASPECT_RATIO];
-            }
-            this.canvas.style.width = `${w}px`;
-            this.canvas.style.height = `${h}px`;
-    
-            this.renderSystem.clear('#008800');
+            this.renderSystem.onResize();
         };
         window.addEventListener('resize', onResize);
         onResize();
     };
-    
-    setupUI = () => {
-        const pauseMenu = document.getElementById("pauseMenu");
-        const resumeBtn = document.getElementById("resumeBtn");
-    
-        const showMenu = (menu: HTMLElement | null, show?: boolean) => {
-            switch (show) {
-                case undefined:
-                    menu?.classList.toggle('active');
-                    break;
-                case true:
-                    menu?.classList.add('active');
-                    break;
-                case false:
-                    menu?.classList.remove('active');
+
+    registerTrigger(input: Trigger, callback: () => void) {
+        this.inputSystem.registerTrigger(input, callback);
+    }
+
+    x: number = 10;
+    y: number = 10;
+    setupTestSprite() {
+        const sprite: Sprite = {
+            image: 'sprite_atlas',
+            x0: 0,
+            y0: 0,
+            width: 16,
+            height: 16,
+            color: '#ffffff'
+        };
+
+        const gameObj = {
+            render: (renderSystem: RenderSystem) => {
+                renderSystem.drawSprite(sprite, this.x, this.y, 128, 128);
             }
         };
-    
-        resumeBtn?.addEventListener('click', (ev: PointerEvent) => {
-            showMenu(pauseMenu, false);
-            ev.stopPropagation();
-        });
 
-        this.inputMapping.get(Inputs.PAUSE)?.push(() => {
-            console.log("PAUSE HIT!");
-            showMenu(pauseMenu);
-        });
-    };
+        const renderGroup = new RenderGroup();
+        renderGroup.add(gameObj);
 
-    triggerInput = (input: Inputs) => {
-        this.inputMapping.get(input)?.forEach(cb => cb());
-    };
+        this.renderSystem.registerRenderGroup(renderGroup);
 
-    setupInputs = () => {
-        // Keyboard inputs
-        window.addEventListener('keydown', (ev: KeyboardEvent) => {
-            switch (ev.key.toLowerCase()) {
-                case 'escape':
-                    this.triggerInput(Inputs.PAUSE);
-            }
-        });
-    };
+        this.renderSystem.clearColor = '#008800';
+    }
+
+    gameLoop() {
+        this.update();
+        this.render();
+
+        requestAnimationFrame(() => this.gameLoop());
+    }
+
+    update() {
+        if (this.paused) {
+            return;
+        }
+
+        if (this.inputSystem.isPressed(State.LEFT)) {
+            this.x--;
+        }
+        if (this.inputSystem.isPressed(State.RIGHT)) {
+            this.x++;
+        }
+        if (this.inputSystem.isPressed(State.UP)) {
+            this.y--;
+        }
+        if (this.inputSystem.isPressed(State.DOWN)) {
+            this.y++;
+        }
+    }
+
+    render() {
+        this.renderSystem.render();
+    }
 }
