@@ -27,19 +27,19 @@ export class UiSystem {
     }
 
     pause() {
-        this.game.paused = true;
+        this.game.pause(true);
         this.showMenu(this.pauseMenu, true);
     }
 
     unpause() {
-        this.game.paused = false;
+        this.game.pause(false);
         this.showMenu(this.pauseMenu, false);
     }
 
     setupUI() {
         this.pauseMenu = document.getElementById("pauseMenu") ?? null;
+        
         const resumeBtn = document.getElementById("resumeBtn");
-    
         resumeBtn?.addEventListener('click', (ev: PointerEvent) => {
             this.unpause();
             ev.stopPropagation();

@@ -1,9 +1,10 @@
 import type { Sprite } from "../data/sprites.js";
 import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
+import type { Vec2 } from "../util/geometry.js";
 
 export type Renderable = {
-    render: (_: RenderSystem) => void;
+    render: (renderSystem: RenderSystem) => void;
 };
 
 export class RenderGroup {
@@ -28,6 +29,8 @@ export class RenderGroup {
 
 export class RenderSystem {
     canvas: HTMLCanvasElement;
+    canvasWidth: number = 0;
+    canvasHeight: number = 0;
     ctx: CanvasRenderingContext2D;
     spriteSystem: ImageSystem;
     renderGroups: RenderGroup[] = [];
@@ -38,19 +41,24 @@ export class RenderSystem {
         this.canvas = canvas;
         this.ctx = this.canvas.getContext('2d')!;
         this.ctx.imageSmoothingEnabled = false;
+
+        this.reset();
+    }
+
+    reset() {
+        this.renderGroups.length = 0;
     }
 
     onResize() {
-        let w, h;
         const [width, height] = [window.innerWidth, window.innerHeight];
         const aspectRatio = width / height;
         if (aspectRatio > constants.CANVAS_ASPECT_RATIO) {
-            [w, h] = [height * constants.CANVAS_ASPECT_RATIO, height];
+            [this.canvasWidth, this.canvasHeight] = [height * constants.CANVAS_ASPECT_RATIO, height];
         } else {
-            [w, h] = [width, width / constants.CANVAS_ASPECT_RATIO];
+            [this.canvasWidth, this.canvasHeight] = [width, width / constants.CANVAS_ASPECT_RATIO];
         }
-        this.canvas.style.width = `${w}px`;
-        this.canvas.style.height = `${h}px`;
+        this.canvas.style.width = `${this.canvasWidth}px`;
+        this.canvas.style.height = `${this.canvasHeight}px`;
 
         this.ctx.imageSmoothingEnabled = false;
 
@@ -84,5 +92,12 @@ export class RenderSystem {
         this.clear(this.clearColor);
 
         this.renderGroups.forEach(rg => rg.render(this));
+    }
+    
+    positionOnCanvas(x: number, y: number): Vec2 {
+        return {
+            x: x / this.canvasWidth * this.canvas.width,
+            y: y / this.canvasHeight * this.canvas.height,
+        };
     }
 }
