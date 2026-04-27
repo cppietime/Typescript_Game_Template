@@ -1,29 +1,42 @@
 import type { Sprite } from "../data/sprites.js";
 import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
-import type { Vec2 } from "../util/geometry.js";
+import type { TlRect, Vec2 } from "../util/geometry.js";
+import { IdMap } from "../util/IdMap.js";
 
 export type Renderable = {
     render: (renderSystem: RenderSystem) => void;
 };
 
 export class RenderGroup {
-    renderables: Renderable[] = [];
+    static RenderGroups = new IdMap<RenderGroup>();
+    id: number;
+    renderables = new IdMap<Renderable>();
     active: boolean = true;
 
-    clear() {
-        this.renderables.splice(0, this.renderables.length);
+    constructor() {
+        this.id = RenderGroup.RenderGroups.add(this);
     }
 
-    add(renderable: Renderable, index?: number) {
-        this.renderables.splice(index ?? this.renderables.length, 0, renderable);
+    clear() {
+        this.renderables.clear();
+    }
+
+    add(renderable: Renderable, index?: number): number {
+        return this.renderables.add(renderable);
+    }
+
+    remove(index: number) {
+        this.renderables.remove(index);
     }
 
     render(renderSystem: RenderSystem) {
         if (!this.active) {
             return;
         }
-        this.renderables.forEach(r => r.render(renderSystem));
+        for (const renderable of this.renderables.values()) {
+            renderable.render(renderSystem);
+        }
     }
 }
 
@@ -32,12 +45,11 @@ export class RenderSystem {
     canvasWidth: number = 0;
     canvasHeight: number = 0;
     ctx: CanvasRenderingContext2D;
-    spriteSystem: ImageSystem;
-    renderGroups: RenderGroup[] = [];
+    spriteSystem = new ImageSystem();
+    renderGroups = new Map<number, RenderGroup>();
     clearColor: string = '#000';
 
     constructor(canvas: HTMLCanvasElement) {
-        this.spriteSystem = new ImageSystem();
         this.canvas = canvas;
         this.ctx = this.canvas.getContext('2d')!;
         this.ctx.imageSmoothingEnabled = false;
@@ -46,7 +58,7 @@ export class RenderSystem {
     }
 
     reset() {
-        this.renderGroups.length = 0;
+        this.renderGroups.clear();
     }
 
     onResize() {
@@ -70,6 +82,14 @@ export class RenderSystem {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
+    drawOutline(rect: TlRect, color: string) {
+        this.ctx.strokeStyle = color;
+        this.ctx.setLineDash([4, 4]);
+        this.ctx.lineWidth = 4;
+        this.ctx.lineCap = "butt";
+        this.ctx.strokeRect(rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y);
+    }
+
     drawSprite(sprite: Sprite, x: number, y: number, w?: number, h?: number) {
         const width = w ?? sprite.width;
         const height = h ?? sprite.height;
@@ -84,14 +104,19 @@ export class RenderSystem {
         this.ctx.drawImage(img, sprite.x0, sprite.y0, sprite.width, sprite.height, x, y, width, height);
     }
 
-    registerRenderGroup(renderGroup: RenderGroup, index?: number) {
-        this.renderGroups.splice(index ?? this.renderGroups.length, 0, renderGroup);
+    getRenderGroup(index: number): RenderGroup {
+        if (!this.renderGroups.has(index)) {
+            this.renderGroups.set(index, new RenderGroup());
+        }
+        return this.renderGroups.get(index)!;
     }
 
     render() {
         this.clear(this.clearColor);
 
-        this.renderGroups.forEach(rg => rg.render(this));
+        for (const renderGroup of this.renderGroups.values()) {
+            renderGroup.render(this);
+        }
     }
     
     positionOnCanvas(x: number, y: number): Vec2 {

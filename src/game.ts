@@ -1,5 +1,6 @@
-import { createPlayer, type Player } from './component/entity/Player.js';
-import { bindRender } from './component/render/RenderComponent.js';
+import { JoystickModule } from './component/controls/Joystick.js';
+import { PlayerModule, type PlayerEntity } from './component/entity/Player.js';
+import { RenderModule } from './component/render/RenderComponent.js';
 import { InputSystem } from './core/InputSystem.js';
 import type { ClickState } from './core/InputSystem.js';
 import { RenderGroup, RenderSystem } from './core/RenderSystem.js';
@@ -8,7 +9,7 @@ import * as constants from './data/constants.js';
 import {State, Trigger} from './data/inputs.js';
 import type { Sprite } from './data/sprites.js';
 import type { Vec2, OriginRect } from './util/geometry.js';
-import { rectContains, tlRectToOrigin } from './util/geometry.js';
+import { RectModule } from './util/geometry.js';
 
 export class Game {
     canvas: HTMLCanvasElement;
@@ -19,12 +20,17 @@ export class Game {
 
     paused = false;
 
+    lastTime = 0;
+    deltaTime = 0;
+
     constructor() {
         this.canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
 
         this.renderSystem = new RenderSystem(this.canvas);
         this.inputSystem = new InputSystem(this);
         this.uiSystem = new UiSystem(this);
+
+        this.lastTime = Date.now();
 
         this.setupCanvas();
 
@@ -47,7 +53,7 @@ export class Game {
         this.inputSystem.registerTrigger(input, callback);
     }
 
-    player?: Player;
+    player?: PlayerEntity;
     setupTestSprite() {
         const sprite: Sprite = {
             image: 'sprite_atlas',
@@ -58,64 +64,24 @@ export class Game {
             color: '#ffffff'
         };
 
-        this.player = createPlayer();
+        this.player = PlayerModule.create(this);
 
-        const joystick = {
-            render (renderSystem: RenderSystem) {
-                renderSystem.drawSprite({
-                    image: '',
-                    x0: 0,
-                    y0: 0,
-                    width: 100,
-                    height: 100,
-                    color: '#000',
-                }, 20, 600, 100, 100);
-            }
-        };
+        const joystick = JoystickModule.create(this);
 
-        const renderGroup = new RenderGroup();
-        renderGroup.add(bindRender(this.player));
-        renderGroup.add(joystick);
-
-        this.renderSystem.registerRenderGroup(renderGroup);
+        const renderGroup = this.renderSystem.getRenderGroup(0);
+        renderGroup.add(RenderModule.bindRender(this.player));
+        renderGroup.add(RenderModule.bindRender(joystick));
 
         this.renderSystem.clearColor = '#008800';
-
-        const leftSquare: OriginRect = tlRectToOrigin({
-            topLeft: {x: 20, y: 600},
-            size: {x: 30, y: 100},
-        });
-        const rightSquare: OriginRect = tlRectToOrigin({
-            topLeft: {x: 90, y: 600},
-            size: {x: 30, y: 100},
-        });
-        const upSquare: OriginRect = tlRectToOrigin({
-            topLeft: {x: 20, y: 600},
-            size: {x: 100, y: 30},
-        });
-        const downSquare: OriginRect = tlRectToOrigin({
-            topLeft: {x: 20, y: 670},
-            size: {x: 100, y: 30},
-        });
-        this.inputSystem.inputRegions.push({
-            predicate: (click: ClickState, states: Set<State>) => {
-                if (!click.down) return false;
-                if (rectContains(leftSquare, click)) states.add(State.LEFT);
-                if (rectContains(rightSquare, click)) states.add(State.RIGHT);
-                if (rectContains(upSquare, click)) states.add(State.UP);
-                if (rectContains(downSquare, click)) states.add(State.DOWN);
-                return false;
-            }
-        });
 
         const centerSquare: OriginRect = {
             origin: {x: 50, y: 630},
             size: {x: 30, y: 30},
         };
-        this.inputSystem.touchListeners.push(clickState => {
+        this.inputSystem.touchListeners.add(clickState => {
             if (!(clickState.down && clickState.initial))
                 return;
-            if (rectContains(centerSquare, clickState)) {
+            if (RectModule.rectContains(centerSquare, clickState)) {
                 console.log('Center click');
             }
         });
@@ -134,24 +100,13 @@ export class Game {
     }
 
     update() {
+        this.deltaTime = Date.now() - this.lastTime;
+        this.lastTime += this.deltaTime;
         if (this.paused) {
             return;
         }
 
-        if (this.player) {
-            if (this.inputSystem.isPressed(State.LEFT)) {
-                this.player.components.rect.origin.x--;
-            }
-            if (this.inputSystem.isPressed(State.RIGHT)) {
-                this.player.components.rect.origin.x++;
-            }
-            if (this.inputSystem.isPressed(State.UP)) {
-                this.player.components.rect.origin.y--;
-            }
-            if (this.inputSystem.isPressed(State.DOWN)) {
-                this.player.components.rect.origin.y++;
-            }
-        }
+        this.player?.components.update(this, this.player);
     }
 
     render() {

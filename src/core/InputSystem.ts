@@ -1,5 +1,6 @@
 import { State, Trigger } from "../data/inputs.js";
 import type { Game } from "../game.js";
+import { IdMap } from "../util/IdMap.js";
 
 export type InputRegion = {
     predicate: (click: ClickState, regionStates: Set<State>) => boolean
@@ -20,9 +21,9 @@ export class InputSystem {
     triggerMapping: Map<Trigger, (() => void)[]> = new Map();
     activeStates: Set<State> = new Set();
     currentClick: ClickState = {x: 0, y: 0, down: false, initial: false};
-    inputRegions: InputRegion[] = [];
+    inputRegions: IdMap<InputRegion> = new IdMap();
     regionStates: Set<State> = new Set();
-    touchListeners: TouchListener[] = [];
+    touchListeners: IdMap<TouchListener> = new IdMap();
 
     constructor(game: Game) {
         this.game = game;
@@ -34,9 +35,9 @@ export class InputSystem {
         this.triggerMapping.clear();
         this.activeStates.clear();
         this.currentClick.down = false;
-        this.inputRegions.length = 0;
+        this.inputRegions.clear()
         this.regionStates.clear();
-        this.touchListeners.length = 0;
+        this.touchListeners.clear()
 
         for (const key of Object.keys(Trigger) as (keyof typeof Trigger)[]) {
             const input = Trigger[key];
@@ -112,7 +113,9 @@ export class InputSystem {
                 this.currentClick.down = true;
                 this.currentClick.initial = true;
                 this.updateRegionStates();
-                this.touchListeners.forEach(listener => listener(this.currentClick));
+                for (const listener of this.touchListeners.values()) {
+                    listener(this.currentClick);
+                }
             });
             this.game.canvas.addEventListener('mouseup', (ev: MouseEvent) => {
                 this.currentClick.down = false;
@@ -134,7 +137,7 @@ export class InputSystem {
 
     updateRegionStates() {
         this.regionStates.clear();
-        for (const inputRegion of this.inputRegions) {
+        for (const inputRegion of this.inputRegions.values()) {
             if (inputRegion.predicate(this.currentClick, this.regionStates)) {
                 return;
             }

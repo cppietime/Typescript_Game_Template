@@ -1,5 +1,27 @@
 {
   "dependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
     "typescript": "^6.0.3"
-  }
+  },
+  "name": "gametest",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cppietime/Typescript_Game_Template.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cppietime/Typescript_Game_Template/issues"
+  },
+  "homepage": "https://github.com/cppietime/Typescript_Game_Template#readme"
 }
