@@ -7,7 +7,7 @@ import { RenderModule, type RenderComponent } from "../render/RenderComponent.js
 import type { Entity, UpdateComponent } from "./Entity.js";
 import { UuidPool, type CleanupFn } from "./Uuid.js";
 
-export type PlayerEntity = Entity<"renderable" | "rect" | "update" | "uuid" | "extra">;
+export type PlayerEntity = Entity<"renderable" | "rect" | "update" | "uuid" | "extra" | "velocity" | "collision">;
 
 type PlayerExtra = {
     pulse: number,
@@ -40,6 +40,10 @@ export const PlayerModule = {
                     pulse: 1,
                     startingTime: game.lastTime
                 } satisfies PlayerExtra,
+                velocity: {x: 0, y: 0},
+                collision: {
+                    collisionSets: []
+                }
             }
         }, PlayerModule.cleanup as CleanupFn);
     },
@@ -60,17 +64,18 @@ export const PlayerModule = {
     },
 
     update: (game: Game, data: PlayerEntity): void => {
+        data.components.velocity = {x: 0, y: 0};
         if (game.inputSystem.isPressed(State.LEFT)) {
-            data.components.rect.origin.x--;
+            data.components.velocity.x--;
         }
         if (game.inputSystem.isPressed(State.RIGHT)) {
-            data.components.rect.origin.x++;
+            data.components.velocity.x++;
         }
         if (game.inputSystem.isPressed(State.UP)) {
-            data.components.rect.origin.y--;
+            data.components.velocity.y--;
         }
         if (game.inputSystem.isPressed(State.DOWN)) {
-            data.components.rect.origin.y++;
+            data.components.velocity.y++;
         }
         const extra = data.components.extra as PlayerExtra;
         extra.startingTime += game.deltaTime;

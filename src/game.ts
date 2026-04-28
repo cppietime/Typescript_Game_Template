@@ -88,6 +88,8 @@ export class Game {
                 console.log('Center click');
             }
         });
+
+        this.physicsSystem.addCollider(this.player.components.uuid.uuid);
     }
 
     gameLoop() {
@@ -110,6 +112,7 @@ export class Game {
         }
 
         this.player?.components.update(this, this.player);
+        this.physicsSystem.checkCollisions(this);
     }
 
     render() {

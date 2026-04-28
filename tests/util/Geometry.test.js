@@ -74,16 +74,28 @@ describe('Collisions', () => {
         });
     });
     test('Miss negative', () => {
-        // TODO
+        const velocity = { x: -1.25, y: -1 };
+        const rect = { topLeft: { x: 1, y: 0 }, bottomRight: { x: 2, y: 1 } };
+        const result = sweptAABB(rect, velocity, 0);
+        expect(result).toBeUndefined();
     });
     test('Miss positive', () => {
-        // TODO
+        const velocity = { x: 2, y: 3 };
+        const rect = { topLeft: { x: 2, y: 1 }, bottomRight: { x: 3, y: 2 } };
+        const result = sweptAABB(rect, velocity, 0);
+        expect(result).toBeUndefined();
     });
     test('Miss horizontal', () => {
-        // TODO
+        const velocity = { x: 2, y: 0 };
+        const rect = { topLeft: { x: 2, y: 1 }, bottomRight: { x: 3, y: 2 } };
+        const result = sweptAABB(rect, velocity, 0);
+        expect(result).toBeUndefined();
     });
     test('Miss vertical', () => {
-        // TODO
+        const velocity = { x: 0, y: 2 };
+        const rect = { topLeft: { x: 2, y: 1 }, bottomRight: { x: 3, y: 2 } };
+        const result = sweptAABB(rect, velocity, 0);
+        expect(result).toBeUndefined();
     });
     test('Miss zero', () => {
         const velocity = { x: 0, y: 0 };
@@ -92,7 +104,19 @@ describe('Collisions', () => {
         expect(result).toBeUndefined();
     });
     test('Miss by start time', () => {
-        // TODO
+        const velocity = { x: 3, y: 1 };
+        const rect = { topLeft: { x: 1, y: 0 }, bottomRight: { x: 2, y: 1 } };
+        const result = sweptAABB(rect, velocity, 2.5 / 3);
+        expect(result).toBeUndefined();
+    });
+    test('Hit with start time', () => {
+        const velocity = { x: 3, y: 1 };
+        const rect = { topLeft: { x: 1, y: 0 }, bottomRight: { x: 2, y: 1 } };
+        const result = sweptAABB(rect, velocity, 1.5 / 3);
+        expect(result).toEqual({
+            normal: Normal.LEFT,
+            time: expect.closeTo(1.5 / 3 + 1 / 3, 5),
+        });
     });
     test('Starts horizontal', () => {
         const velocity = { x: 1.5, y: 0 };

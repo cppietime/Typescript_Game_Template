@@ -1,4 +1,4 @@
-import { Normal } from "../component/physics/Collision";
+import { Normal } from "../component/physics/Collision.js";
 
 export type Vec2 = {
     x: number,
