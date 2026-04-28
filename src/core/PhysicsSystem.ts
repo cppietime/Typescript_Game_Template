@@ -184,12 +184,13 @@ export class PhysicsSystem {
         return collisions;
     }
 
+    static readonly EPSILON = 5e-2; // Design question. Experimental?
     static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
         if (entityHas(entity, "velocity")) {
             const ellapsed = (collision.time - (localTime.get(entity.components.uuid.uuid) ?? 0)) * deltaTime;
             const vel = entity.components.velocity;
-            entity.components.rect.origin.x += ellapsed * vel.x;
-            entity.components.rect.origin.y += ellapsed * vel.y;
+            entity.components.rect.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
+            entity.components.rect.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
             switch (collision.normal) {
                 case Normal.LEFT:
                     vel.x = Math.min(vel.x, 0);

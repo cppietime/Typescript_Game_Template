@@ -45,7 +45,8 @@ export class Game {
         this.setupTestSprite();
         this.gameLoop();
     }
-    setupCanvas = () => {
+    
+    setupCanvas() {
         
         this.canvas.width = constants.CANVAS_WIDTH;
         this.canvas.height = constants.CANVAS_HEIGHT;
@@ -54,8 +55,23 @@ export class Game {
             this.renderSystem.onResize();
         };
         window.addEventListener('resize', onResize);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.loseFocus();
+            } else {
+                this.gainFocus();
+            }
+        });
         onResize();
     };
+
+    loseFocus() {
+        this.uiSystem.pause();
+    }
+
+    gainFocus() {
+        this.lastTime = Date.now() / 1000;
+    }
 
     registerTrigger(input: Trigger, callback: () => void) {
         this.inputSystem.registerTrigger(input, callback);
