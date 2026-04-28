@@ -4,7 +4,7 @@ import type { Game } from "../../game.js";
 import { entityHas, type Entity } from "../entity/Entity.js";
 import { UuidPool, type CleanupFn, type UuidComponent } from "../entity/Uuid.js";
 import { RenderModule } from "../render/RenderComponent.js";
-import { type OriginRect, RectModule } from "../../util/geometry.js";
+import { type OriginRect, RectModule } from "../../util/Geometry.js";
 import type { RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
 

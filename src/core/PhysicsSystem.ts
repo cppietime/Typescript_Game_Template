@@ -1,4 +1,10 @@
-import type { Collider } from "../component/physics/Collision.js";
+import { entityHas, type Entity } from "../component/entity/Entity";
+import { UuidPool } from "../component/entity/Uuid";
+import { CollisionModule, Normal, type CollisionEvent } from "../component/physics/Collision";
+import type { Game } from "../game";
+import { CustomSet } from "../util/CustomSet";
+import { RectModule, type CornerRect, type OriginRect, type Vec2 } from "../util/Geometry";
+import { MinHeap } from "../util/MinHeap";
 
 type SapEdge = {
     pos: number,
@@ -6,32 +12,223 @@ type SapEdge = {
     uuid: number,
 };
 
-type ColliderHandle = {
+type SapHandle = {
     left: SapEdge,
     right: SapEdge,
     top: SapEdge,
     bottom: SapEdge,
 };
 
+type ECU = Entity<"collision" | "uuid">;
+type ECUR = Entity<"collision" | "uuid" | "rect">;
+
+type CollisionState = {
+    candidatePairs: [number, number][],
+    candidatesMap: Map<number, number[]>,
+    involvedEvents: Map<number, CollisionEvent[]>,
+    localTime: Map<number, number>,
+    priorityQueue: MinHeap<CollisionEvent>,
+    eventQueue: CollisionEvent[],
+    firedTriggers: CustomSet<[number, number]>,
+};
+
+function resetCollisionState(state: CollisionState) {
+    state.candidatePairs.length = 0;
+    state.candidatesMap.clear();
+    state.involvedEvents.clear();
+    state.localTime.clear();
+    state.priorityQueue.clear();
+    state.eventQueue.length = 0;
+    state.firedTriggers.clear();
+}
+
 export class PhysicsSystem {
     // These two lists store the edges of the bounding box of possible collisions.
     // I.e. if the object is moving, it should encompass everything between current and proposed position.
     readonly edgesX: SapEdge[] = [];
     readonly edgesY: SapEdge[] = [];
-    readonly colliderHandles = new Map<number, ColliderHandle>();
+    readonly sapHandles = new Map<number, SapHandle>();
+    readonly colliderIds: Set<number> = new Set();
+    readonly collisionState: CollisionState = {
+        candidatePairs: [],
+        candidatesMap: new Map(),
+        involvedEvents: new Map(),
+        localTime: new Map(),
+        priorityQueue: new MinHeap((a, b) => a.time - b.time),
+        eventQueue: [],
+        firedTriggers: CustomSet.pairSet(),
+    };
 
-    addCollider(collider: Collider) {
-        const left: SapEdge = {pos: 0, isBeginning: true, uuid: collider.uuid};
-        const right: SapEdge = {pos: 0, isBeginning: false, uuid: collider.uuid};
-        const top: SapEdge = {pos: 0, isBeginning: true, uuid: collider.uuid};
-        const bottom: SapEdge = {pos: 0, isBeginning: false, uuid: collider.uuid};
+    addCollider(uuid: number) {
+        const left: SapEdge = {pos: 0, isBeginning: true, uuid: uuid};
+        const right: SapEdge = {pos: 0, isBeginning: false, uuid: uuid};
+        const top: SapEdge = {pos: 0, isBeginning: true, uuid: uuid};
+        const bottom: SapEdge = {pos: 0, isBeginning: false, uuid: uuid};
         this.edgesX.push(left, right);
         this.edgesY.push(top, bottom);
-        this.colliderHandles.set(collider.uuid, {left: left, right: right, top: top, bottom: bottom});
+        this.sapHandles.set(uuid, {left: left, right: right, top: top, bottom: bottom});
+        this.colliderIds.add(uuid);
     }
 
     getHandle(uuid: number) {
-        return this.colliderHandles.get(uuid);
+        return this.sapHandles.get(uuid);
+    }
+
+    removeCollider(uuid: number) {
+        this.sapHandles.delete(uuid);
+    }
+
+    static sweepAndPrune(edges: SapEdge[]) {
+        const activeSets: Set<number> = new Set();
+        const candidates: CustomSet<[number, number]> = CustomSet.pairSet();
+        for (const {isBeginning, uuid} of edges) {
+            if (isBeginning) {
+                activeSets.add(uuid);
+            } else {
+                activeSets.delete(uuid);
+                activeSets.forEach((id) => {
+                    candidates.add([uuid, id]);
+                });
+            }
+        }
+        return candidates;
+    }
+
+    static writeCandidatesMap(pair: [number, number], map: Map<number, number[]>) {
+        const [a, b] = pair;
+        if (!map.has(a)) {
+            map.set(a, []);
+        }
+        if (!map.has(b)) {
+            map.set(b, []);
+        }
+        map.get(a)!.push(b);
+        map.get(b)!.push(a);
+    }
+
+    static colliderTimeVel(ent: ECUR, localTime: Map<number, number>): {time: number, velocity: Vec2} {
+        const time = localTime.get(ent.components.uuid.uuid)!;
+        const velocity = entityHas(ent, "velocity") ? ent.components.velocity : {x: 0, y: 0};
+        return {time: time, velocity: velocity};
+    }
+
+    static colliderStartingPos(ent: ECUR, startTime: number, localTime: Map<number, number>): Vec2 {
+        const currentPos = ent.components.rect.origin;
+        if (!entityHas(ent, "velocity")) {
+            return currentPos;
+        }
+        const velocity = ent.components.velocity;
+        const t = startTime - localTime.get(ent.components.uuid.uuid)!;
+        return {
+            x: currentPos.x + t * velocity.x,
+            y: currentPos.y + t * velocity.y,
+        };
+    }
+
+    static collisionsFromPair(pair: [number, number], localTime: Map<number, number>): CollisionEvent[] {
+        const entities = pair.map(id => UuidPool.get(id));
+        const noneMissing = (es: (Entity<"uuid"> | undefined)[]): es is [ECUR, ECUR] =>
+            !es.some(e => e == undefined || !entityHas(e, "collision") || !entityHas(e, "rect"));
+        if (!noneMissing(entities)) {
+            return [];
+        }
+        const [a, b] = entities;
+        const {time: aTime, velocity: aVel} = PhysicsSystem.colliderTimeVel(a, localTime);
+        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(a, localTime);
+        const relVel: Vec2 = {x: aVel.x - bVel.x, y: aVel.y - bVel.y};
+        const initialTime = Math.max(aTime, bTime);
+        const aPos = PhysicsSystem.colliderStartingPos(a, initialTime, localTime);
+        const bPos = PhysicsSystem.colliderStartingPos(b, initialTime, localTime);
+        for (const setA of a.components.collision.collisionSets) {
+            bLoop: for (const setB of b.components.collision.collisionSets) {
+                const layers = CollisionModule.matchingLayers(setA.layers, setB.mask);
+                const invLayers = CollisionModule.matchingLayers(setB.layers, setA.mask);
+                if (layers.size === 0 && invLayers.size === 0) {
+                    continue bLoop;
+                }
+                for (const rectA of setA.rects) {
+                    const {topLeft: tlA, bottomRight: brA} = RectModule.Origin.toCorner(rectA);
+                    for (const rectB of setB.rects) {
+                        const {topLeft: tlB, bottomRight: brB} = RectModule.Origin.toCorner(rectB);
+                        const topLeft = {x: tlB.x + bPos.x - brA.x - aPos.x, y: tlB.y + bPos.y - brA.y - aPos.y};
+                        const bottomRight = {x: brB.x + bPos.x - tlA.x - aPos.x, y: brB.y + bPos.y - tlA.y - aPos.y};
+                    }
+                }
+            }
+        }
+        // TODO
+        return [];
+    }
+
+    checkCollisions(game: Game) {
+        resetCollisionState(this.collisionState);
+
+        // Update bounding boxes
+        const deadColliders: Set<number> = new Set();
+        for (const colliderId of this.colliderIds) {
+            const entity = UuidPool.get(colliderId);
+            if (entity === undefined) {
+                continue;
+            }
+            if (entity === undefined || !entityHas(entity, "collision") || !entityHas(entity, "rect") || !entity.components.uuid.alive) {
+                deadColliders.add(colliderId);
+                continue;
+            }
+            CollisionModule.updateCollisions(this, entity);
+        }
+
+        for (const deadCollider of deadColliders) {
+            this.colliderIds.delete(deadCollider);
+        }
+
+        // Sweep and prune
+        // X
+        const xPairs = PhysicsSystem.sweepAndPrune(this.edgesX);
+        // Y
+        const yPairs = PhysicsSystem.sweepAndPrune(this.edgesY);
+        for (const pair of xPairs) {
+            if (yPairs.has(pair)) {
+                PhysicsSystem.writeCandidatesMap(pair, this.collisionState.candidatesMap);
+                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime);
+                for (const collision of collisions) {
+                    this.collisionState.priorityQueue.insert(collision);
+                    pair.forEach((id) => {
+                        if (!this.collisionState.involvedEvents.has(id)) {
+                            this.collisionState.involvedEvents.set(id, []);
+                        }
+                        this.collisionState.involvedEvents.get(id)!.push(collision);
+                    });
+                }
+            }
+        }
+
+
+        for (const nextCollision of this.collisionState.priorityQueue) {
+            if (nextCollision.isSolid) {
+                // Resolve solid collisions
+
+                // Update position and velocities of both entities
+
+                // Invalidate all remaining collisions of both entities
+
+                // Recalculate collisions involving either entity and add back to priority queue
+            } else {
+                // Check if this pair of box sets already has a trigger registered
+                const key: [number, number] = [nextCollision.self.uuid, nextCollision.trigger.uuid];
+
+                if (!this.collisionState.firedTriggers.has(key)) {
+                    // If not, register it
+                    this.collisionState.firedTriggers.add(key);
+                    this.collisionState.eventQueue.push(nextCollision);
+                }
+            }
+        }
+
+        // Fire all registered collision events
+        for (const collision of this.collisionState.eventQueue) {
+            if (collision.layers.size > 0) collision.self.onCollide?.(collision);
+            if (collision.invLayers.size > 0) collision.trigger.onCollide?.(CollisionModule.invert(collision));
+        }
     }
 
 };

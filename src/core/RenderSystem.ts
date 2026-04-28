@@ -1,7 +1,7 @@
 import type { Sprite } from "../data/sprites.js";
 import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
-import type { TlRect, Vec2 } from "../util/geometry.js";
+import type { TlRect, Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
 
 export type Renderable = {

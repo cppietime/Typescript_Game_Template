@@ -3,13 +3,14 @@ import { PlayerModule, type PlayerEntity } from './component/entity/Player.js';
 import { RenderModule } from './component/render/RenderComponent.js';
 import { InputSystem } from './core/InputSystem.js';
 import type { ClickState } from './core/InputSystem.js';
+import { PhysicsSystem } from './core/PhysicsSystem.js';
 import { RenderGroup, RenderSystem } from './core/RenderSystem.js';
 import { UiSystem } from './core/UiSystem.js';
 import * as constants from './data/constants.js';
 import {State, Trigger} from './data/inputs.js';
 import type { Sprite } from './data/sprites.js';
-import type { Vec2, OriginRect } from './util/geometry.js';
-import { RectModule } from './util/geometry.js';
+import type { Vec2, OriginRect } from './util/Geometry.js';
+import { RectModule } from './util/Geometry.js';
 
 export class Game {
     canvas: HTMLCanvasElement;
@@ -17,6 +18,7 @@ export class Game {
     renderSystem: RenderSystem;
     inputSystem: InputSystem;
     uiSystem: UiSystem;
+    physicsSystem: PhysicsSystem;
 
     paused = false;
 
@@ -29,6 +31,7 @@ export class Game {
         this.renderSystem = new RenderSystem(this.canvas);
         this.inputSystem = new InputSystem(this);
         this.uiSystem = new UiSystem(this);
+        this.physicsSystem = new PhysicsSystem();
 
         this.lastTime = Date.now();
 

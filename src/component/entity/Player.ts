@@ -2,7 +2,7 @@ import type { Renderable, RenderSystem } from "../../core/RenderSystem.js";
 import { State } from "../../data/inputs.js";
 import type { Sprite } from "../../data/sprites.js";
 import type { Game } from "../../game.js";
-import { RectModule } from "../../util/geometry.js";
+import { RectModule } from "../../util/Geometry.js";
 import { RenderModule, type RenderComponent } from "../render/RenderComponent.js";
 import type { Entity, UpdateComponent } from "./Entity.js";
 import { UuidPool, type CleanupFn } from "./Uuid.js";

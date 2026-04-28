@@ -1,6 +1,6 @@
 import type { Renderable, RenderGroup, RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
-import { RectModule } from "../../util/geometry.js";
+import { RectModule } from "../../util/Geometry.js";
 import type { Entity } from "../entity/Entity.js";
 
 export type RenderHandle = {
