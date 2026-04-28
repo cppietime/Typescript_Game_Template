@@ -132,15 +132,15 @@ export function sweptAABB(rect: CornerRect, velocity: Vec2, startTime: number): 
             normal = velocity.y > 0 ? Normal.TOP : Normal.BOTTOM;
         }
         tMax = Math.min(tMaxX, tMaxY);
-        if (tMin > tMax) {
+    }
+    if (tMin > tMax) {
+        return undefined;
+    }
+    if (tMin < 0) {
+        if (tMax < 0) {
             return undefined;
         }
-        if (tMin < 0) {
-            if (tMax < 0) {
-                return undefined;
-            }
-            return {time: startTime, normal: Normal.PREVIOUS};
-        }
+        return {time: startTime, normal: Normal.PREVIOUS};
     }
     if (tMin + startTime > 1) {
         return undefined;
