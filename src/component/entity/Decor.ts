@@ -3,15 +3,15 @@ import type { Sprite } from "../../data/sprites.js";
 import type { Game } from "../../game.js";
 import { CollisionModule, type CollisionSet } from "../physics/Collision.js";
 import { RenderModule } from "../render/RenderComponent.js";
-import type { Entity } from "./Entity.js";
+import type { Entity, UpdateComponent } from "./Entity.js";
 import { UuidPool } from "./Uuid.js";
 
-export type Decor = Entity<"uuid" | "renderable" | "rect" | "collision">;
+export type Decor = Entity<"uuid" | "renderable" | "rect" | "collision" | "update"| "extra" | "velocity">;
 
 export const DecorModule = {
-    createSolid: (game: Game): Decor => {
+    createDecor: (game: Game, solid: boolean = true): Decor => {
         const collisionSets: CollisionSet[] = []
-        const solid = UuidPool.withUuid({
+        const decor = UuidPool.withUuid({
             game: game,
             components: {
                 renderable: RenderModule.staticSpriteRenderer({
@@ -26,17 +26,26 @@ export const DecorModule = {
                 collision: {
                     collisionSets: collisionSets
                 },
+                extra: false,
+                update: DecorModule.updateDecorTest as UpdateComponent<any>,
+                velocity: {x: 0, y: 0},
             },
         });
-        collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: solid.components.uuid.uuid,
-            isSolid: true,
-            layers: new Set([1]),
-            mask: new Set([1]),
-            rects: [
-                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
-            ],
-        }));
-        return solid;
+        return decor;
+    },
+
+    updateDecorTest: (game: Game, data: Decor) => {
+        if (data.components.extra) {
+            data.components.velocity.x = -1.5;
+        } else {
+            data.components.velocity.x = 1.5;
+        }
+
+        const x = data.components.rect.origin.x;
+        if (x > 800) {
+            data.components.extra = true;
+        } else if (x < 120) {
+            data.components.extra = false;
+        }
     },
 };

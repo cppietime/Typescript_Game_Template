@@ -111,6 +111,21 @@ export const CollisionModule = {
         return match;
     },
 
+    invertNormal: (normal: Normal): Normal => {
+        switch (normal) {
+            case Normal.BOTTOM:
+                return Normal.TOP;
+            case Normal.TOP:
+                return Normal.BOTTOM;
+            case Normal.LEFT:
+                return Normal.RIGHT;
+            case Normal.RIGHT:
+                return Normal.LEFT;
+            case Normal.PREVIOUS:
+                return Normal.PREVIOUS;
+        }
+    },
+
     invert: (collisionEvent: CollisionEvent): CollisionEvent => {
         return {
             self: collisionEvent.trigger,
@@ -120,7 +135,7 @@ export const CollisionModule = {
             isSolid: collisionEvent.isSolid,
             isValid: collisionEvent.isValid,
             time: collisionEvent.time,
-            normal: collisionEvent.normal,
+            normal: CollisionModule.invertNormal(collisionEvent.normal),
         };
     },
 

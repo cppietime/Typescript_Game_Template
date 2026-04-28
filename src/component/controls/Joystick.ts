@@ -11,7 +11,7 @@ import type { Sprite } from "../../data/sprites.js";
 export type Joystick = Entity<"renderable" | "uuid" | "extra" | "rect">;
 
 export const JoystickModule = {
-    create: (game: Game): Joystick => {
+    createDpad8: (game: Game): Joystick => {
         const leftSquare: OriginRect = RectModule.TopLeft.toOrigin({
             topLeft: {x: 20, y: 600},
             size: {x: 30, y: 100},

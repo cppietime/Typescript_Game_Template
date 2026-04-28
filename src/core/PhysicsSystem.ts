@@ -149,8 +149,8 @@ export class PhysicsSystem {
         for (const setA of a.components.collision.collisionSets) {
             bSetLoop: for (const setB of b.components.collision.collisionSets) {
                 let firstSweep: SweepResult | undefined;
-                const layers = CollisionModule.matchingLayers(setA.layers, setB.mask);
-                const invLayers = CollisionModule.matchingLayers(setB.layers, setA.mask);
+                const layers = CollisionModule.matchingLayers(setB.layers, setA.mask);
+                const invLayers = CollisionModule.matchingLayers(setA.layers, setB.mask);
                 if (layers.size === 0 && invLayers.size === 0) {
                     continue bSetLoop;
                 }
@@ -191,16 +191,21 @@ export class PhysicsSystem {
     static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>) {
         if (entityHas(entity, "velocity")) {
             const ellapsed = collision.time - (localTime.get(entity.components.uuid.uuid) ?? 0);
-            entity.components.rect.origin.x += ellapsed * entity.components.velocity.x;
-            entity.components.rect.origin.y += ellapsed * entity.components.velocity.y;
+            const vel = entity.components.velocity;
+            entity.components.rect.origin.x += ellapsed * vel.x;
+            entity.components.rect.origin.y += ellapsed * vel.y;
             switch (collision.normal) {
                 case Normal.LEFT:
+                    vel.x = Math.min(vel.x, 0);
+                    break;
                 case Normal.RIGHT:
-                    entity.components.velocity.x = 0;
+                    vel.x = Math.max(vel.x, 0);
                     break;
                 case Normal.TOP:
+                    vel.y = Math.min(vel.y, 0);
+                    break;
                 case Normal.BOTTOM:
-                    entity.components.velocity.y = 0;
+                    vel.y = Math.max(vel.y, 0);
                     break;
             }
         }
@@ -253,19 +258,16 @@ export class PhysicsSystem {
             if (!nextCollision.isValid) {
                 continue;
             }
-            if (nextCollision.isSolid) {
-                // Ignore static solid collisions
-                // Messy, probably buggy, but I dunno how to deal with that
-                if (nextCollision.normal === Normal.PREVIOUS) {
-                    continue;
-                }
-
+            const inverse = CollisionModule.invert(nextCollision);
+            // Ignore static solid collisions
+            // Messy, probably buggy, but I dunno how to deal with that
+            if (nextCollision.isSolid && nextCollision.normal !== Normal.PREVIOUS) {
                 // Resolve solid collisions
                 const selfEnt = UuidPool.get(nextCollision.self.entityId)! as ECUR;
                 const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as ECUR;
 
                 PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime);
-                PhysicsSystem.resolveCollisionFor(triggerEnt, nextCollision, this.collisionState.localTime);
+                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime);
                 
                 this.collisionState.localTime.set(selfEnt.components.uuid.uuid, nextCollision.time);
                 this.collisionState.localTime.set(triggerEnt.components.uuid.uuid, nextCollision.time);
@@ -290,22 +292,21 @@ export class PhysicsSystem {
                     selfEvents.push(collision);
                     triggerEvents.push(collision);
                 }
-            } else {
-                // Check if this pair of box sets already has a trigger registered
-                const key: [number, number] = [nextCollision.self.uuid, nextCollision.trigger.uuid];
+            }
+            // Check if this pair of box sets already has a trigger registered
+            const key: [number, number] = [nextCollision.self.uuid, nextCollision.trigger.uuid];
 
-                if (!this.collisionState.firedTriggers.has(key)) {
-                    // If not, register it
-                    this.collisionState.firedTriggers.add(key);
-                    this.collisionState.eventQueue.push(nextCollision);
-                }
+            if (!this.collisionState.firedTriggers.has(key)) {
+                // If not, register it
+                this.collisionState.firedTriggers.add(key);
+                this.collisionState.eventQueue.push(nextCollision, inverse);
             }
         }
 
         // Fire all registered collision events
         for (const collision of this.collisionState.eventQueue) {
             if (collision.layers.size > 0) collision.self.onCollide?.(collision);
-            if (collision.invLayers.size > 0) collision.trigger.onCollide?.(CollisionModule.invert(collision));
+            //if (collision.invLayers.size > 0) collision.trigger.onCollide?.(CollisionModule.invert(collision));
         }
 
         // Resolve remaining velocities

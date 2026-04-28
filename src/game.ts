@@ -8,6 +8,7 @@ import type { ClickState } from './core/InputSystem.js';
 import { PhysicsSystem } from './core/PhysicsSystem.js';
 import { RenderGroup, RenderSystem } from './core/RenderSystem.js';
 import { UiSystem } from './core/UiSystem.js';
+import { UpdateSystem } from './core/UpdateSystem.js';
 import * as constants from './data/constants.js';
 import {State, Trigger} from './data/inputs.js';
 import type { Sprite } from './data/sprites.js';
@@ -21,6 +22,7 @@ export class Game {
     inputSystem: InputSystem;
     uiSystem: UiSystem;
     physicsSystem: PhysicsSystem;
+    updateSystem: UpdateSystem;
 
     paused = false;
 
@@ -34,6 +36,7 @@ export class Game {
         this.inputSystem = new InputSystem(this);
         this.uiSystem = new UiSystem(this);
         this.physicsSystem = new PhysicsSystem();
+        this.updateSystem = new UpdateSystem();
 
         this.lastTime = Date.now();
 
@@ -71,7 +74,7 @@ export class Game {
 
         this.player = PlayerModule.create(this);
 
-        const joystick = JoystickModule.create(this);
+        const joystick = JoystickModule.createDpad8(this);
 
         const renderGroup = this.renderSystem.getRenderGroup(0);
         renderGroup.add(RenderModule.bindRender(this.player));
@@ -93,10 +96,54 @@ export class Game {
 
         this.physicsSystem.addCollider(this.player.components.uuid.uuid);
 
-        const prop = DecorModule.createSolid(this);
-        prop.components.rect.origin = {x: 400, y: 144};
+        const prop = DecorModule.createDecor(this);
+        prop.components.rect.origin = {x: 400.5, y: 144};
         this.physicsSystem.addCollider(prop.components.uuid.uuid);
         renderGroup.add(RenderModule.bindRender(prop));
+        prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
+            entityId: prop.components.uuid.uuid,
+            isSolid: true,
+            layers: new Set([1]),
+            mask: new Set([1]),
+            rects: [
+                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+            ],
+            onCollide: () => console.log('Solid Collision')
+        }));
+
+        const trigger = DecorModule.createDecor(this, false);
+        trigger.components.rect.origin = {x: 220, y: 544};
+        this.physicsSystem.addCollider(trigger.components.uuid.uuid);
+        renderGroup.add(RenderModule.bindRender(trigger));
+        trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
+            entityId: trigger.components.uuid.uuid,
+            isSolid: false,
+            layers: new Set([]),
+            mask: new Set([1]),
+            rects: [
+                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+            ],
+            onCollide: () => console.log('Nonsolid Collision')
+        }));
+
+        const triggered = DecorModule.createDecor(this, false);
+        triggered.components.rect.origin = {x: 300, y: 300};
+        this.physicsSystem.addCollider(triggered.components.uuid.uuid);
+        renderGroup.add(RenderModule.bindRender(triggered));
+        triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
+            entityId: triggered.components.uuid.uuid,
+            isSolid: false,
+            layers: new Set([0]),
+            mask: new Set([]),
+            rects: [
+                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+            ],
+        }));
+
+        this.updateSystem.add(this.player);
+        this.updateSystem.add(prop);
+        this.updateSystem.add(trigger);
+        this.updateSystem.add(triggered);
     }
 
     gameLoop() {
@@ -118,7 +165,9 @@ export class Game {
             return;
         }
 
-        this.player?.components.update(this, this.player);
+        // this.player?.components.update(this, this.player);
+        this.updateSystem.update(this);
+
         this.physicsSystem.checkCollisions(this);
     }
 
