@@ -24,6 +24,8 @@ const sprite: Sprite = {
     color: '#fff',
 };
 
+const PLAYER_SPEED = 300;
+
 export const PlayerModule = {
 
     create: (game: Game): PlayerEntity => {
@@ -80,19 +82,19 @@ export const PlayerModule = {
     update: (game: Game, data: PlayerEntity): void => {
         data.components.velocity = {x: 0, y: 0};
         if (game.inputSystem.isPressed(State.LEFT)) {
-            data.components.velocity.x--;
+            data.components.velocity.x -= PLAYER_SPEED;
         }
         if (game.inputSystem.isPressed(State.RIGHT)) {
-            data.components.velocity.x++;
+            data.components.velocity.x += PLAYER_SPEED;
         }
         if (game.inputSystem.isPressed(State.UP)) {
-            data.components.velocity.y--;
+            data.components.velocity.y -= PLAYER_SPEED;
         }
         if (game.inputSystem.isPressed(State.DOWN)) {
-            data.components.velocity.y++;
+            data.components.velocity.y += PLAYER_SPEED;
         }
         const extra = data.components.extra as PlayerExtra;
         extra.startingTime += game.deltaTime;
-        extra.pulse = 0.333 * (Math.sin(extra.startingTime / 1000) + 3);
+        extra.pulse = 0.333 * (Math.sin(extra.startingTime) + 3);
     },
 };

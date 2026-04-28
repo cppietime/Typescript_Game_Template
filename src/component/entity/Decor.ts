@@ -8,6 +8,8 @@ import { UuidPool } from "./Uuid.js";
 
 export type Decor = Entity<"uuid" | "renderable" | "rect" | "collision" | "update"| "extra" | "velocity">;
 
+const DECOR_SPEED = 400;
+
 export const DecorModule = {
     createDecor: (game: Game, solid: boolean = true): Decor => {
         const collisionSets: CollisionSet[] = []
@@ -36,9 +38,9 @@ export const DecorModule = {
 
     updateDecorTest: (game: Game, data: Decor) => {
         if (data.components.extra) {
-            data.components.velocity.x = -1.5;
+            data.components.velocity.x = -DECOR_SPEED;
         } else {
-            data.components.velocity.x = 1.5;
+            data.components.velocity.x = DECOR_SPEED;
         }
 
         const x = data.components.rect.origin.x;

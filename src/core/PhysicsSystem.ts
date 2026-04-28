@@ -111,18 +111,14 @@ export class PhysicsSystem {
         map.get(b)!.push(a);
     }
 
-    static colliderTimeVel(ent: ECUR, localTime: Map<number, number>): {time: number, velocity: Vec2} {
+    static colliderTimeVel(ent: ECUR, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
         const time = localTime.get(ent.components.uuid.uuid)!;
         const velocity = entityHas(ent, "velocity") ? ent.components.velocity : {x: 0, y: 0};
-        return {time: time, velocity: velocity};
+        return {time: time, velocity: {x: velocity.x * deltaTime, y: velocity.y * deltaTime}};
     }
 
-    static colliderStartingPos(ent: ECUR, startTime: number, localTime: Map<number, number>): Vec2 {
+    static colliderStartingPos(ent: ECUR, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
         const currentPos = ent.components.rect.origin;
-        if (!entityHas(ent, "velocity")) {
-            return currentPos;
-        }
-        const velocity = ent.components.velocity;
         const t = startTime - localTime.get(ent.components.uuid.uuid)!;
         return {
             x: currentPos.x + t * velocity.x,
@@ -130,7 +126,7 @@ export class PhysicsSystem {
         };
     }
 
-    static collisionsFromPair(pair: [number, number], localTime: Map<number, number>): CollisionEvent[] {
+    static collisionsFromPair(pair: [number, number], localTime: Map<number, number>, deltaTime: number): CollisionEvent[] {
         const entities = pair.map(id => UuidPool.get(id));
         const noneMissing = (es: (Entity<"uuid"> | undefined)[]): es is [ECUR, ECUR] =>
             !es.some(e => e == undefined || !entityHas(e, "collision") || !entityHas(e, "rect"));
@@ -138,12 +134,12 @@ export class PhysicsSystem {
             return [];
         }
         const [a, b] = entities;
-        const {time: aTime, velocity: aVel} = PhysicsSystem.colliderTimeVel(a, localTime);
-        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(b, localTime);
+        const {time: aTime, velocity: aVel} = PhysicsSystem.colliderTimeVel(a, localTime, deltaTime);
+        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(b, localTime, deltaTime);
         const relVel: Vec2 = {x: aVel.x - bVel.x, y: aVel.y - bVel.y};
         const initialTime = Math.max(aTime, bTime);
-        const aPos = PhysicsSystem.colliderStartingPos(a, initialTime, localTime);
-        const bPos = PhysicsSystem.colliderStartingPos(b, initialTime, localTime);
+        const aPos = PhysicsSystem.colliderStartingPos(a, aVel, initialTime, localTime);
+        const bPos = PhysicsSystem.colliderStartingPos(b, bVel, initialTime, localTime);
 
         const collisions: CollisionEvent[] = [];
         for (const setA of a.components.collision.collisionSets) {
@@ -188,9 +184,9 @@ export class PhysicsSystem {
         return collisions;
     }
 
-    static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>) {
+    static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
         if (entityHas(entity, "velocity")) {
-            const ellapsed = collision.time - (localTime.get(entity.components.uuid.uuid) ?? 0);
+            const ellapsed = (collision.time - (localTime.get(entity.components.uuid.uuid) ?? 0)) * deltaTime;
             const vel = entity.components.velocity;
             entity.components.rect.origin.x += ellapsed * vel.x;
             entity.components.rect.origin.y += ellapsed * vel.y;
@@ -238,10 +234,11 @@ export class PhysicsSystem {
         const xPairs = PhysicsSystem.sweepAndPrune(this.edgesX);
         // Y
         const yPairs = PhysicsSystem.sweepAndPrune(this.edgesY);
+        const deltaTime = game.deltaTime;
         for (const pair of xPairs) {
             if (yPairs.has(pair)) {
                 PhysicsSystem.writeCandidatesMap(pair, this.collisionState.candidatesMap);
-                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime);
+                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
                 for (const collision of collisions) {
                     this.collisionState.priorityQueue.insert(collision);
                     pair.forEach((id) => {
@@ -266,8 +263,8 @@ export class PhysicsSystem {
                 const selfEnt = UuidPool.get(nextCollision.self.entityId)! as ECUR;
                 const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as ECUR;
 
-                PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime);
-                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime);
+                PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime);
+                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime);
                 
                 this.collisionState.localTime.set(selfEnt.components.uuid.uuid, nextCollision.time);
                 this.collisionState.localTime.set(triggerEnt.components.uuid.uuid, nextCollision.time);
@@ -286,7 +283,7 @@ export class PhysicsSystem {
 
                 // Recalculate collisions involving either entity and add back to priority queue
                 const pair: [number, number] = [nextCollision.self.entityId, nextCollision.trigger.entityId];
-                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime);
+                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
                 for (const collision of collisions) {
                     this.collisionState.priorityQueue.insert(collision);
                     selfEvents.push(collision);
@@ -321,7 +318,7 @@ export class PhysicsSystem {
             }
             const origin = entity.components.rect.origin;
             const velocity = entity.components.velocity;
-            const ellapsed = 1 - localTime;
+            const ellapsed = (1 - localTime) * deltaTime;
             origin.x += velocity.x * ellapsed;
             origin.y += velocity.y * ellapsed;
         }

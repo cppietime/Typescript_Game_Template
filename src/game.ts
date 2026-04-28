@@ -38,7 +38,7 @@ export class Game {
         this.physicsSystem = new PhysicsSystem();
         this.updateSystem = new UpdateSystem();
 
-        this.lastTime = Date.now();
+        this.lastTime = Date.now() / 1000;
 
         this.setupCanvas();
 
@@ -158,9 +158,16 @@ export class Game {
         this.inputSystem.onInterrupt();
     }
 
+    frames = 0;
+    runTime = 0;
     update() {
-        this.deltaTime = Date.now() - this.lastTime;
+        this.deltaTime = Date.now() / 1000 - this.lastTime;
         this.lastTime += this.deltaTime;
+        this.frames++;
+        this.runTime += this.deltaTime;
+        if (this.frames % 100 === 0) {
+            console.log(this.frames / this.runTime, 'FPS');
+        }
         if (this.paused) {
             return;
         }
