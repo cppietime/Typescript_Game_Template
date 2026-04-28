@@ -1,5 +1,7 @@
 import { JoystickModule } from './component/controls/Joystick.js';
+import { DecorModule } from './component/entity/Decor.js';
 import { PlayerModule, type PlayerEntity } from './component/entity/Player.js';
+import { CollisionModule } from './component/physics/Collision.js';
 import { RenderModule } from './component/render/RenderComponent.js';
 import { InputSystem } from './core/InputSystem.js';
 import type { ClickState } from './core/InputSystem.js';
@@ -90,6 +92,11 @@ export class Game {
         });
 
         this.physicsSystem.addCollider(this.player.components.uuid.uuid);
+
+        const prop = DecorModule.createSolid(this);
+        prop.components.rect.origin = {x: 400, y: 144};
+        this.physicsSystem.addCollider(prop.components.uuid.uuid);
+        renderGroup.add(RenderModule.bindRender(prop));
     }
 
     gameLoop() {

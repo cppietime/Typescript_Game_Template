@@ -9,6 +9,16 @@ export class IdMap<T> {
         return id;
     }
 
+    addAndTag(value: Omit<T, "uuid">): T {
+        const id = this.reserve();
+        const tagged = {
+            ...value,
+            uuid: id,
+        } as T;
+        this.addReserved(id, tagged);
+        return tagged;
+    }
+
     reserve(): number {
         const id = this.nextId++;
         this.reserved.add(id);

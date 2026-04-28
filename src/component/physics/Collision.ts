@@ -87,7 +87,7 @@ export type CollisionSet = {
     layers: Set<number>,
     mask: Set<number>,
     rects: OriginRect[],
-    onCollide: CollisionFn | undefined,
+    onCollide?: CollisionFn | undefined,
 };
 
 export type CollisionComponent = {
@@ -140,7 +140,8 @@ export const CollisionModule = {
                 maxY = Math.max(maxY, bottomRight.y);
             }
         }
-        return RectModule.TopLeft.toOrigin({topLeft: {x: minX, y: minY}, size: {x: maxX - minX, y: maxY - minY}});
+        const origin = data.components.rect.origin;
+        return RectModule.TopLeft.toOrigin({topLeft: {x: minX + origin.x, y: minY + origin.y}, size: {x: maxX - minX, y: maxY - minY}});
     },
 
     updateCollisions: (physicsSystem: PhysicsSystem, data: Entity<"collision" | "rect" | "uuid">) => {

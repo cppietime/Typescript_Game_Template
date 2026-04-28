@@ -2,6 +2,7 @@ import { entityHas, type Entity } from "../component/entity/Entity.js";
 import { UuidPool } from "../component/entity/Uuid.js";
 import { CollisionModule, Normal, type CollisionEvent } from "../component/physics/Collision.js";
 import type { Game } from "../game.js";
+import { insertionSort } from "../util/Algorithm.js";
 import { CustomSet } from "../util/CustomSet.js";
 import { RectModule, sweptAABB, type CornerRect, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";
 import { MinHeap } from "../util/MinHeap.js";
@@ -11,6 +12,10 @@ type SapEdge = {
     isBeginning: boolean,
     uuid: number,
 };
+
+function sapEdgeCmp(left: SapEdge, right: SapEdge): number {
+    return left.pos - right.pos;
+}
 
 type SapHandle = {
     left: SapEdge,
@@ -134,7 +139,7 @@ export class PhysicsSystem {
         }
         const [a, b] = entities;
         const {time: aTime, velocity: aVel} = PhysicsSystem.colliderTimeVel(a, localTime);
-        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(a, localTime);
+        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(b, localTime);
         const relVel: Vec2 = {x: aVel.x - bVel.x, y: aVel.y - bVel.y};
         const initialTime = Math.max(aTime, bTime);
         const aPos = PhysicsSystem.colliderStartingPos(a, initialTime, localTime);
@@ -212,8 +217,12 @@ export class PhysicsSystem {
                 deadColliders.add(colliderId);
                 continue;
             }
+            this.collisionState.localTime.set(entity.components.uuid.uuid, 0);
             CollisionModule.updateCollisions(this, entity);
         }
+
+        insertionSort(this.edgesX, sapEdgeCmp);
+        insertionSort(this.edgesY, sapEdgeCmp);
 
         for (const deadCollider of deadColliders) {
             this.colliderIds.delete(deadCollider);
