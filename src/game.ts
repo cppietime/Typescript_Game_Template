@@ -14,6 +14,7 @@ import {State, Trigger} from './data/inputs.js';
 import type { Sprite } from './data/sprites.js';
 import type { Vec2, OriginRect } from './util/Geometry.js';
 import { RectModule } from './util/Geometry.js';
+import {ScrollModule} from './component/entity/Scroll.js';
 
 export class Game {
     canvas: HTMLCanvasElement;
@@ -92,7 +93,9 @@ export class Game {
 
         const joystick = JoystickModule.createDpad8(this);
 
-        const renderGroup = this.renderSystem.getRenderGroup(0);
+        const bgGroup = this.renderSystem.getRenderGroup(0);
+
+        const renderGroup = this.renderSystem.getRenderGroup(1);
         renderGroup.add(RenderModule.bindRender(this.player));
         renderGroup.add(RenderModule.bindRender(joystick));
 
@@ -155,6 +158,16 @@ export class Game {
                 {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
             ],
         }));
+
+        const bg = ScrollModule.create(this, {
+            image: 'background',
+            x0: 0,
+            y0: 0,
+            width: 1280,
+            height: 720,
+            color: '#f00',
+        });
+        bgGroup.add(RenderModule.bindRender(bg));
 
         this.updateSystem.add(this.player);
         this.updateSystem.add(prop);

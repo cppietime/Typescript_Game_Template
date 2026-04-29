@@ -11,3 +11,5 @@ export const insertionSort = <T>(array: T[], cmpFn: Comparator<T>) => {
         }
     }
 };
+
+export const modulo = (a: number, b: number): number => ((a % b) + b) % b;

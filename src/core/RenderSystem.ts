@@ -4,6 +4,8 @@ import * as constants from '../data/constants.js';
 import type { TlRect, Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
 
+// TODO: streamline Renderable into the rendering component, so everything is an entity
+// Then I can also add z-index logic
 export type Renderable = {
     render: (renderSystem: RenderSystem) => void;
 };
@@ -48,6 +50,7 @@ export class RenderSystem {
     spriteSystem = new ImageSystem();
     renderGroups = new Map<number, RenderGroup>();
     clearColor: string = '#000';
+    offset: Vec2 = {x: 0, y: 0};
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -82,17 +85,28 @@ export class RenderSystem {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    drawOutline(rect: TlRect, color: string) {
+    drawOutline(rect: TlRect, color: string, relative: boolean = false) {
+        let {x, y} = rect.topLeft;
+        let {x: w, y: h} = rect.size;
+        if (relative) {
+            x = x + this.canvas.width / 2 - this.offset.x;
+            y = y + this.canvas.height / 2 - this.offset.y;
+        }
         this.ctx.strokeStyle = color;
         this.ctx.setLineDash([4, 4]);
         this.ctx.lineWidth = 4;
         this.ctx.lineCap = "butt";
-        this.ctx.strokeRect(rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y);
+        this.ctx.strokeRect(x, y, w, h);
     }
 
-    drawSprite(sprite: Sprite, x: number, y: number, w?: number, h?: number) {
+    drawSprite(sprite: Sprite, x: number, y: number, w?: number, h?: number, relative: boolean = false) {
         const width = w ?? sprite.width;
         const height = h ?? sprite.height;
+
+        if (relative) {
+            x = x + this.canvas.width / 2 - this.offset.x;
+            y = y + this.canvas.height / 2 - this.offset.y;
+        }
 
         const img = this.spriteSystem.images.get(sprite.image);
         if (img === undefined) {

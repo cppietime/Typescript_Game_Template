@@ -75,8 +75,8 @@ export const PlayerModule = {
         const h = extra.pulse * rect.size.y;
         const x = rect.origin.x - w / 2;
         const y = rect.origin.y - h / 2;
-        renderSystem.drawOutline(RectModule.Origin.toTl(rect), '#fff');
-        renderSystem.drawSprite(sprite, x, y, w, h);
+        renderSystem.drawOutline(RectModule.Origin.toTl(rect), '#fff', true);
+        renderSystem.drawSprite(sprite, x, y, w, h, true);
     },
 
     update: (game: Game, data: PlayerEntity): void => {
@@ -96,5 +96,7 @@ export const PlayerModule = {
         const extra = data.components.extra as PlayerExtra;
         extra.startingTime += game.deltaTime;
         extra.pulse = 0.333 * (Math.sin(extra.startingTime) + 3);
+
+        game.renderSystem.offset = data.components.rect.origin;
     },
 };

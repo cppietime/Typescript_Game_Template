@@ -10,6 +10,7 @@ export type RenderHandle = {
 
 export type RenderFn = (renderSystem: RenderSystem, data: Entity<any>) => void;
 
+// TODO: Replace Renderable with just this type, add z-index
 export type RenderComponent = {
     renderable: RenderFn,
     visible: boolean,
@@ -29,7 +30,7 @@ export const RenderModule = {
     staticSpriteRenderer: (sprite: Sprite): RenderComponent => {
         return RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<"renderable" | "rect">) => {
                 const rect = RectModule.Origin.toTl(data.components.rect);
-                renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y);
+                renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y, true);
             });
     },
 
