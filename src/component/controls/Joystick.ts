@@ -3,12 +3,13 @@ import { State } from "../../data/inputs.js";
 import type { Game } from "../../game.js";
 import { entityHas, type Entity } from "../entity/Entity.js";
 import { UuidPool, type CleanupFn, type UuidComponent } from "../entity/Uuid.js";
-import { RenderModule } from "../render/RenderComponent.js";
+import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
 import { type OriginRect, RectModule } from "../../util/Geometry.js";
 import type { RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
+import type { OriginEntity } from "../physics/Physical.js";
 
-export type Joystick = Entity<"renderable" | "extra" | "rect">;
+export type Joystick = RenderEntity & OriginEntity & {components: {region: number}};
 
 export const JoystickModule = {
     createDpad8: (game: Game): Joystick => {
@@ -65,15 +66,14 @@ export const JoystickModule = {
                             renderSystem.drawSprite(sprite, square.x, square.y, 30, 30)
                         }
                     }),
-                extra: rgnId,
-                rect: RectModule.TopLeft.toOrigin({topLeft: {x: 20, y: 600}, size: {x: 100, y: 100}}),
+                region: rgnId,
+                ...RectModule.TopLeft.toOrigin({topLeft: {x: 20, y: 600}, size: {x: 100, y: 100}}),
             },
-        }, JoystickModule.cleanup as CleanupFn);
+        }, JoystickModule.cleanup as CleanupFn) satisfies Joystick;
     },
 
     cleanup: (data: Joystick) => {
-        if (!entityHas(data, "extra")) return;
-        const rgnId = data.components.extra as number;
+        const rgnId = data.components.region as number;
         const inputRegions = data.game.inputSystem.inputRegions;
         inputRegions.remove(rgnId);
         

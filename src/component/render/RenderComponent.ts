@@ -1,7 +1,8 @@
 import type { RenderGroup, RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
 import { RectModule } from "../../util/Geometry.js";
-import type { Entity } from "../entity/Entity.js";
+import type { Entity, With } from "../entity/Entity.js";
+import {hasSize, type OriginEntity} from "../physics/Physical.js";
 
 export type RenderHandle = {
     groupId: number,
@@ -17,11 +18,12 @@ export type RenderComponent = {
     handles: RenderHandle[],
 };
 
-export type Renderable = Entity<"renderable">;
+type WithRenderComponent = With<RenderComponent, "renderable">;
+export type RenderEntity = Entity<WithRenderComponent>;
 
 export const RenderModule = {
 
-    fromCallback: <T extends Renderable>(renderFn: RenderFn): RenderComponent => {
+    fromCallback: <T extends RenderEntity>(renderFn: RenderFn): RenderComponent => {
         return {
             render: renderFn,
             visible: true,
@@ -30,19 +32,25 @@ export const RenderModule = {
     },
 
     staticSpriteRenderer: (sprite: Sprite): RenderComponent => {
-        return RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<"renderable" | "rect">) => {
-                const rect = RectModule.Origin.toTl(data.components.rect);
+        return RenderModule.fromCallback((renderSystem: RenderSystem, data: RenderEntity & OriginEntity) => {
+                let w: number, h: number;
+                if (hasSize(data)) {
+                    ({x: w, y: h} = data.components.size);
+                } else {
+                    ({width: w, height: h} = sprite);
+                }
+                const rect = RectModule.Origin.toTl({origin: data.components.origin, size: {x: w, y: h}});
                 renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y, true);
             });
     },
 
     sequentialRenderer:  (...renderers: RenderComponent[]): RenderComponent => {
-        return RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<never>) => {
+        return RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => {
                 renderers.forEach(renderer => renderer.render(renderSystem, data));
             });
     },
 
-    addToRenderGroup: (renderGroup: RenderGroup, entity: Renderable) => {
+    addToRenderGroup: (renderGroup: RenderGroup, entity: RenderEntity) => {
         const id = renderGroup.add(entity);
         entity.components.renderable.handles.push({groupId: renderGroup.id, renderId: id});
     },

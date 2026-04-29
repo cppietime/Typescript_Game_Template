@@ -1,7 +1,7 @@
 import { IdMap } from "../../util/IdMap.js";
-import type { ComponentMap, Entity } from "./Entity.js";
+import type { Entity } from "./Entity.js";
 
-export type CleanupFn = (data: Entity<never>) => void;
+export type CleanupFn = (data: Entity<{}>) => void;
 
 export type UuidComponent = {
     uuid: number,
@@ -12,9 +12,9 @@ export type UuidComponent = {
 export const UNASSIGNED = -1;
 
 export const UuidPool = {
-    uuidMap: new IdMap<Entity<never>>(),
+    uuidMap: new IdMap<Entity<{}>>(),
 
-    withUuid: <K extends keyof ComponentMap>(entity: Omit<Entity<K>, "uuid" | "cleanup" | "isAlive">, cleanup?: CleanupFn): Entity<K> => {
+    withUuid: <T extends Entity<any>>(entity: Omit<T, "uuid" | "cleanup" | "isAlive">, cleanup?: CleanupFn): T => {
         const uuid = UuidPool.uuidMap.reserve();
         const withUuid = {
             ...entity,
@@ -26,10 +26,10 @@ export const UuidPool = {
             },
         };
         UuidPool.uuidMap.addReserved(uuid, withUuid);
-        return withUuid;
+        return withUuid as T;
     },
 
-    release: (entity: Entity<never>): void => {
+    release: (entity: Entity<{}>): void => {
         entity.isAlive = false;
 
         entity.cleanup?.(entity);
@@ -39,7 +39,7 @@ export const UuidPool = {
         }
     },
 
-    get: (uuid: number): Entity<never> | undefined => {
+    get: (uuid: number): Entity<{}> | undefined => {
         return UuidPool.uuidMap.get(uuid);
     }
 };

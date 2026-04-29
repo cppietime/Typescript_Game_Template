@@ -116,7 +116,7 @@ export class Game {
         this.physicsSystem.addCollider(this.player.uuid);
 
         const prop = DecorModule.createDecor(this);
-        prop.components.rect.origin = {x: 400.5, y: 144};
+        prop.components.origin = {x: 400.5, y: 144};
         this.physicsSystem.addCollider(prop.uuid);
         renderGroup.add(prop);
         prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
@@ -131,7 +131,7 @@ export class Game {
         }));
 
         const trigger = DecorModule.createDecor(this, false);
-        trigger.components.rect.origin = {x: 220, y: 544};
+        trigger.components.origin = {x: 220, y: 544};
         this.physicsSystem.addCollider(trigger.uuid);
         renderGroup.add(trigger);
         trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
@@ -146,7 +146,7 @@ export class Game {
         }));
 
         const triggered = DecorModule.createDecor(this, false);
-        triggered.components.rect.origin = {x: 300, y: 300};
+        triggered.components.origin = {x: 300, y: 300};
         this.physicsSystem.addCollider(triggered.uuid);
         renderGroup.add(triggered);
         triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
@@ -165,7 +165,7 @@ export class Game {
             y0: 0,
             width: 1280,
             height: 720,
-            color: '#f00',
+            color: '#ff0',
         });
         bgGroup.add(bg);
 

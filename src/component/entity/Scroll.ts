@@ -2,25 +2,34 @@ import { RenderSystem } from '../../core/RenderSystem.js';
 import { type Sprite } from '../../data/sprites.js';
 import { Game } from '../../game.js';
 import { modulo } from '../../util/Algorithm.js';
-import { type RenderFn, RenderModule } from '../render/RenderComponent.js';
+import type { Vec2 } from '../../util/Geometry.js';
+import { hasSize, type OriginEntity, type SizeEntity } from '../physics/Physical.js';
+import { type RenderEntity, type RenderFn, RenderModule } from '../render/RenderComponent.js';
 import type { Entity } from './Entity.js';
 import { UuidPool } from './Uuid.js';
 
-export type ScrollingBackground = Entity<"renderable" | "rect">;
+export type ScrollingBackground = RenderEntity & OriginEntity;
 
 export const ScrollModule = {
-    create: (game: Game, sprite: Sprite): ScrollingBackground => {
+    create: (game: Game, sprite: Sprite): ScrollingBackground & SizeEntity => {
         return UuidPool.withUuid({
             game: game,
             components: {
-                rect: {origin: {x: 300, y: 0}, size: {x: 1280, y: 720}},
+                origin: {x: 300, y: 0},
+                size: {x: 1280, y: 720},
                 renderable: RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => ScrollModule.render(renderSystem, data as ScrollingBackground, sprite))
             },
         });
     },
 
     render: (renderSystem: RenderSystem, data: ScrollingBackground, sprite: Sprite) => {
-        const {origin, size} = data.components.rect;
+        const origin = data.components.origin;
+        let size: Vec2;
+        if (hasSize(data)) {
+            size = data.components.size;
+        } else {
+            size = {x: sprite.width, y: sprite.height};
+        }
         const {x: width, y: height} = size;
         const diffX = modulo(origin.x - renderSystem.offset.x, width);
         const diffY = modulo(origin.y - renderSystem.offset.y, height);

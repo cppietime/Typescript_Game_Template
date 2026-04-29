@@ -1,19 +1,23 @@
 import type { RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
 import type { Game } from "../../game.js";
-import { CollisionModule, type CollisionSet } from "../physics/Collision.js";
-import { RenderModule } from "../render/RenderComponent.js";
-import type { Entity, UpdateComponent } from "./Entity.js";
+import { CollisionModule, type CollisionEntity, type CollisionSet } from "../physics/Collision.js";
+import type { OriginEntity, SizeEntity, VelocityEntity } from "../physics/Physical.js";
+import type { TickComponent, TickEntity } from "../physics/Tick.js";
+import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
+import type { Entity } from "./Entity.js";
 import { UuidPool } from "./Uuid.js";
 
-export type Decor = Entity<"renderable" | "rect" | "collision" | "update"| "extra" | "velocity">;
+export type Decor = RenderEntity & TickEntity & CollisionEntity & SizeEntity & VelocityEntity & {
+    components: {extra: boolean}
+};
 
 const DECOR_SPEED = 400;
 
 export const DecorModule = {
     createDecor: (game: Game, solid: boolean = true): Decor => {
         const collisionSets: CollisionSet[] = []
-        const decor = UuidPool.withUuid({
+        const decor: Decor = UuidPool.withUuid({
             game: game,
             components: {
                 renderable: RenderModule.staticSpriteRenderer({
@@ -24,12 +28,13 @@ export const DecorModule = {
                     height: 16,
                     color: '#00f',
                 }),
-                rect: {origin: {x: 0, y: 0}, size: {x: 64, y: 64}},
+                origin: {x: 0, y: 0},
+                size: {x: 64, y: 64},
                 collision: {
                     collisionSets: collisionSets
                 },
                 extra: false,
-                update: DecorModule.updateDecorTest as UpdateComponent<any>,
+                tick: DecorModule.updateDecorTest as TickComponent,
                 velocity: {x: 0, y: 0},
             },
         });
@@ -43,7 +48,7 @@ export const DecorModule = {
             data.components.velocity.x = DECOR_SPEED;
         }
 
-        const x = data.components.rect.origin.x;
+        const x = data.components.origin.x;
         if (x > 800) {
             data.components.extra = true;
         } else if (x < 120) {

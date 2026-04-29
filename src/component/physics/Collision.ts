@@ -2,7 +2,8 @@ import type { PhysicsSystem } from "../../core/PhysicsSystem.js";
 import type { Game } from "../../game.js";
 import { RectModule, type OriginRect } from "../../util/Geometry.js";
 import { IdMap } from "../../util/IdMap.js";
-import { entityHas, type Entity } from "../entity/Entity.js";
+import { entityHas, type Entity, type With } from "../entity/Entity.js";
+import { hasVelocity, type OriginEntity } from "./Physical.js";
 
 /*
 entity:
@@ -94,10 +95,14 @@ export type CollisionComponent = {
     collisionSets: CollisionSet[],
 };
 
+type WithCollision = With<CollisionComponent, "collision">;
+export type CollisionEntity = Entity<WithCollision> & OriginEntity;
+export const hasCollision = (entity: Entity<any>): entity is CollisionEntity => entityHas<CollisionEntity>(entity, ["collision", "origin"]);
+
 export const CollisionModule = {
     collisionSetMap: new IdMap<CollisionSet>(),
 
-    cleanup: (game: Game, data: Entity<"collision">) => {
+    cleanup: (game: Game, data: CollisionEntity) => {
         game.physicsSystem.removeCollider(data.uuid);
     },
 
@@ -143,7 +148,7 @@ export const CollisionModule = {
         physicsSystem.addCollider(uuid);
     },
 
-    calculateBoundingBox: (data: Entity<"collision" | "rect">): OriginRect => {
+    calculateBoundingBox: (data: CollisionEntity & OriginEntity): OriginRect => {
         let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
         for (const collisionSet of data.components.collision.collisionSets) {
             for (const rect of collisionSet.rects) {
@@ -155,11 +160,11 @@ export const CollisionModule = {
                 maxY = Math.max(maxY, bottomRight.y);
             }
         }
-        const origin = data.components.rect.origin;
+        const origin = data.components.origin;
         return RectModule.TopLeft.toOrigin({topLeft: {x: minX + origin.x, y: minY + origin.y}, size: {x: maxX - minX, y: maxY - minY}});
     },
 
-    updateCollisions: (physicsSystem: PhysicsSystem, data: Entity<"collision" | "rect">) => {
+    updateCollisions: (physicsSystem: PhysicsSystem, data: CollisionEntity & OriginEntity) => {
         const handle = physicsSystem.getHandle(data.uuid);
         if (handle === undefined) {
             return;
@@ -169,7 +174,7 @@ export const CollisionModule = {
         const bottomRight = RectModule.Origin.bottomRight(box);
         let [minX, minY] = [topLeft.x, topLeft.y];
         let [maxX, maxY] = [bottomRight.x, bottomRight.y];
-        if (entityHas(data, "velocity")) {
+        if (hasVelocity(data)) {
             const vel = data.components.velocity;
             minX = Math.min(minX, minX + vel.x);
             maxX = Math.max(maxX, maxX + vel.x);

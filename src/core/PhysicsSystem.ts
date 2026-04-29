@@ -1,6 +1,7 @@
 import { entityHas, type Entity } from "../component/entity/Entity.js";
 import { UuidPool } from "../component/entity/Uuid.js";
-import { CollisionModule, Normal, type CollisionEvent } from "../component/physics/Collision.js";
+import { CollisionModule, hasCollision, Normal, type CollisionEntity, type CollisionEvent } from "../component/physics/Collision.js";
+import { hasOrigin, hasVelocity, type OriginEntity } from "../component/physics/Physical.js";
 import type { Game } from "../game.js";
 import { insertionSort } from "../util/Algorithm.js";
 import { CustomSet } from "../util/CustomSet.js";
@@ -23,9 +24,6 @@ type SapHandle = {
     top: SapEdge,
     bottom: SapEdge,
 };
-
-type ECU = Entity<"collision">;
-type ECUR = Entity<"collision" | "rect">;
 
 type CollisionState = {
     candidatePairs: [number, number][],
@@ -111,14 +109,14 @@ export class PhysicsSystem {
         map.get(b)!.push(a);
     }
 
-    static colliderTimeVel(ent: ECUR, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
+    static colliderTimeVel(ent: CollisionEntity, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
         const time = localTime.get(ent.uuid)!;
-        const velocity = entityHas(ent, "velocity") ? ent.components.velocity : {x: 0, y: 0};
+        const velocity = hasVelocity(ent) ? ent.components.velocity : {x: 0, y: 0};
         return {time: time, velocity: {x: velocity.x * deltaTime, y: velocity.y * deltaTime}};
     }
 
-    static colliderStartingPos(ent: ECUR, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
-        const currentPos = ent.components.rect.origin;
+    static colliderStartingPos(ent: CollisionEntity, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
+        const currentPos = ent.components.origin;
         const t = startTime - localTime.get(ent.uuid)!;
         return {
             x: currentPos.x + t * velocity.x,
@@ -128,8 +126,8 @@ export class PhysicsSystem {
 
     static collisionsFromPair(pair: [number, number], localTime: Map<number, number>, deltaTime: number): CollisionEvent[] {
         const entities = pair.map(id => UuidPool.get(id));
-        const noneMissing = (es: (Entity<never> | undefined)[]): es is [ECUR, ECUR] =>
-            !es.some(e => e == undefined || !entityHas(e, "collision") || !entityHas(e, "rect"));
+        const noneMissing = (es: (Entity<{}> | undefined)[]): es is [CollisionEntity, CollisionEntity] =>
+            !es.some(e => e == undefined || !hasCollision(e));
         if (!noneMissing(entities)) {
             return [];
         }
@@ -185,12 +183,12 @@ export class PhysicsSystem {
     }
 
     static readonly EPSILON = 5e-2; // Design question. Experimental?
-    static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
-        if (entityHas(entity, "velocity")) {
+    static resolveCollisionFor(entity: CollisionEntity, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
+        if (hasVelocity(entity)) {
             const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime;
             const vel = entity.components.velocity;
-            entity.components.rect.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
-            entity.components.rect.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
+            entity.components.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
+            entity.components.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
             switch (collision.normal) {
                 case Normal.LEFT:
                     vel.x = Math.min(vel.x, 0);
@@ -215,7 +213,7 @@ export class PhysicsSystem {
         const deadColliders: Set<number> = new Set();
         for (const colliderId of this.colliderIds) {
             const entity = UuidPool.get(colliderId);
-            if (entity === undefined || !entityHas(entity, "collision") || !entityHas(entity, "rect") || !entity.isAlive) {
+            if (entity === undefined || !hasCollision(entity) || !entity.isAlive) {
                 deadColliders.add(colliderId);
                 continue;
             }
@@ -261,8 +259,8 @@ export class PhysicsSystem {
             // Messy, probably buggy, but I dunno how to deal with that
             if (nextCollision.isSolid && nextCollision.normal !== Normal.PREVIOUS) {
                 // Resolve solid collisions
-                const selfEnt = UuidPool.get(nextCollision.self.entityId)! as ECUR;
-                const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as ECUR;
+                const selfEnt = UuidPool.get(nextCollision.self.entityId)! as CollisionEntity;
+                const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as CollisionEntity;
 
                 PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime);
                 PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime);
@@ -309,15 +307,15 @@ export class PhysicsSystem {
 
         // Resolve remaining velocities
         for (const colliderId of this.colliderIds) {
-            const entity = UuidPool.get(colliderId) as ECUR;
-            if (!entityHas(entity, "velocity")) {
+            const entity = UuidPool.get(colliderId) as CollisionEntity;
+            if (!hasVelocity(entity)) {
                 continue;
             }
             const localTime = this.collisionState.localTime.get(colliderId) ?? 0;
             if (localTime >= 1) {
                 continue;
             }
-            const origin = entity.components.rect.origin;
+            const origin = entity.components.origin;
             const velocity = entity.components.velocity;
             const ellapsed = (1 - localTime) * deltaTime;
             origin.x += velocity.x * ellapsed;

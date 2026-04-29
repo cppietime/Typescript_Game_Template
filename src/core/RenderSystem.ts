@@ -3,12 +3,12 @@ import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
 import type { TlRect, Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
-import type { Renderable } from "../component/render/RenderComponent.js";
+import type { RenderEntity } from "../component/render/RenderComponent.js";
 
 export class RenderGroup {
     static RenderGroups = new IdMap<RenderGroup>();
     id: number;
-    renderables = new IdMap<Renderable>();
+    renderables = new IdMap<RenderEntity>();
     active: boolean = true;
 
     constructor() {
@@ -19,7 +19,7 @@ export class RenderGroup {
         this.renderables.clear();
     }
 
-    add(renderable: Renderable, index?: number): number {
+    add(renderable: RenderEntity, index?: number): number {
         return this.renderables.add(renderable);
     }
 
