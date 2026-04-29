@@ -3,12 +3,7 @@ import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
 import type { TlRect, Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
-
-// TODO: streamline Renderable into the rendering component, so everything is an entity
-// Then I can also add z-index logic
-export type Renderable = {
-    render: (renderSystem: RenderSystem) => void;
-};
+import type { Renderable } from "../component/render/RenderComponent.js";
 
 export class RenderGroup {
     static RenderGroups = new IdMap<RenderGroup>();
@@ -37,7 +32,7 @@ export class RenderGroup {
             return;
         }
         for (const renderable of this.renderables.values()) {
-            renderable.render(renderSystem);
+            renderable.components.renderable.render(renderSystem, renderable);
         }
     }
 }

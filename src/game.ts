@@ -96,8 +96,8 @@ export class Game {
         const bgGroup = this.renderSystem.getRenderGroup(0);
 
         const renderGroup = this.renderSystem.getRenderGroup(1);
-        renderGroup.add(RenderModule.bindRender(this.player));
-        renderGroup.add(RenderModule.bindRender(joystick));
+        renderGroup.add(this.player);
+        renderGroup.add(joystick);
 
         this.renderSystem.clearColor = '#008800';
 
@@ -118,7 +118,7 @@ export class Game {
         const prop = DecorModule.createDecor(this);
         prop.components.rect.origin = {x: 400.5, y: 144};
         this.physicsSystem.addCollider(prop.components.uuid.uuid);
-        renderGroup.add(RenderModule.bindRender(prop));
+        renderGroup.add(prop);
         prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: prop.components.uuid.uuid,
             isSolid: true,
@@ -133,7 +133,7 @@ export class Game {
         const trigger = DecorModule.createDecor(this, false);
         trigger.components.rect.origin = {x: 220, y: 544};
         this.physicsSystem.addCollider(trigger.components.uuid.uuid);
-        renderGroup.add(RenderModule.bindRender(trigger));
+        renderGroup.add(trigger);
         trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: trigger.components.uuid.uuid,
             isSolid: false,
@@ -148,7 +148,7 @@ export class Game {
         const triggered = DecorModule.createDecor(this, false);
         triggered.components.rect.origin = {x: 300, y: 300};
         this.physicsSystem.addCollider(triggered.components.uuid.uuid);
-        renderGroup.add(RenderModule.bindRender(triggered));
+        renderGroup.add(triggered);
         triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: triggered.components.uuid.uuid,
             isSolid: false,
@@ -167,7 +167,7 @@ export class Game {
             height: 720,
             color: '#f00',
         });
-        bgGroup.add(RenderModule.bindRender(bg));
+        bgGroup.add(bg);
 
         this.updateSystem.add(this.player);
         this.updateSystem.add(prop);
