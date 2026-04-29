@@ -4,18 +4,19 @@ import { Game } from '../../game.js';
 import { modulo } from '../../util/Algorithm.js';
 import { type RenderFn, RenderModule } from '../render/RenderComponent.js';
 import type { Entity } from './Entity.js';
+import { UuidPool } from './Uuid.js';
 
 export type ScrollingBackground = Entity<"renderable" | "rect">;
 
 export const ScrollModule = {
     create: (game: Game, sprite: Sprite): ScrollingBackground => {
-        return {
+        return UuidPool.withUuid({
             game: game,
             components: {
                 rect: {origin: {x: 300, y: 0}, size: {x: 1280, y: 720}},
                 renderable: RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => ScrollModule.render(renderSystem, data as ScrollingBackground, sprite))
             },
-        };
+        });
     },
 
     render: (renderSystem: RenderSystem, data: ScrollingBackground, sprite: Sprite) => {

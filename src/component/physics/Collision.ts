@@ -97,8 +97,8 @@ export type CollisionComponent = {
 export const CollisionModule = {
     collisionSetMap: new IdMap<CollisionSet>(),
 
-    cleanup: (game: Game, data: Entity<"collision" | "uuid">) => {
-        game.physicsSystem.removeCollider(data.components.uuid.uuid);
+    cleanup: (game: Game, data: Entity<"collision">) => {
+        game.physicsSystem.removeCollider(data.uuid);
     },
 
     matchingLayers: (layers: Set<number>, mask: Set<number>): Set<number> => {
@@ -159,8 +159,8 @@ export const CollisionModule = {
         return RectModule.TopLeft.toOrigin({topLeft: {x: minX + origin.x, y: minY + origin.y}, size: {x: maxX - minX, y: maxY - minY}});
     },
 
-    updateCollisions: (physicsSystem: PhysicsSystem, data: Entity<"collision" | "rect" | "uuid">) => {
-        const handle = physicsSystem.getHandle(data.components.uuid.uuid);
+    updateCollisions: (physicsSystem: PhysicsSystem, data: Entity<"collision" | "rect">) => {
+        const handle = physicsSystem.getHandle(data.uuid);
         if (handle === undefined) {
             return;
         }

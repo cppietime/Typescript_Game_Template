@@ -8,7 +8,7 @@ import { type OriginRect, RectModule } from "../../util/Geometry.js";
 import type { RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
 
-export type Joystick = Entity<"renderable" | "uuid" | "extra" | "rect">;
+export type Joystick = Entity<"renderable" | "extra" | "rect">;
 
 export const JoystickModule = {
     createDpad8: (game: Game): Joystick => {

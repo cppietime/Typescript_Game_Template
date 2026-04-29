@@ -6,7 +6,7 @@ import { RenderModule } from "../render/RenderComponent.js";
 import type { Entity, UpdateComponent } from "./Entity.js";
 import { UuidPool } from "./Uuid.js";
 
-export type Decor = Entity<"uuid" | "renderable" | "rect" | "collision" | "update"| "extra" | "velocity">;
+export type Decor = Entity<"renderable" | "rect" | "collision" | "update"| "extra" | "velocity">;
 
 const DECOR_SPEED = 400;
 

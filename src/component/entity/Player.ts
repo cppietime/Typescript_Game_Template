@@ -8,7 +8,7 @@ import { RenderModule } from "../render/RenderComponent.js";
 import type { Entity, UpdateComponent } from "./Entity.js";
 import { UuidPool, type CleanupFn } from "./Uuid.js";
 
-export type PlayerEntity = Entity<"renderable" | "rect" | "update" | "uuid" | "extra" | "velocity" | "collision">;
+export type PlayerEntity = Entity<"renderable" | "rect" | "update" | "extra" | "velocity" | "collision">;
 
 type PlayerExtra = {
     pulse: number,
@@ -51,7 +51,7 @@ export const PlayerModule = {
             }
         }, PlayerModule.cleanup as CleanupFn);
         collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: player.components.uuid.uuid,
+            entityId: player.uuid,
             isSolid: true,
             layers: new Set([1]),
             mask: new Set([0]),

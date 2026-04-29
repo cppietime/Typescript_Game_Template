@@ -1,7 +1,7 @@
 import { IdMap } from "../../util/IdMap.js";
 import type { ComponentMap, Entity } from "./Entity.js";
 
-export type CleanupFn = (data: Entity<"uuid">) => void;
+export type CleanupFn = (data: Entity<never>) => void;
 
 export type UuidComponent = {
     uuid: number,
@@ -9,40 +9,37 @@ export type UuidComponent = {
     cleanup?: CleanupFn | undefined,
 };
 
-export const UuidPool = {
-    uuidMap: new IdMap<Entity<"uuid">>(),
+export const UNASSIGNED = -1;
 
-    withUuid: <K extends keyof ComponentMap>(entity: Entity<K>, cleanup?: CleanupFn): Entity<K | "uuid"> => {
+export const UuidPool = {
+    uuidMap: new IdMap<Entity<never>>(),
+
+    withUuid: <K extends keyof ComponentMap>(entity: Omit<Entity<K>, "uuid" | "cleanup" | "isAlive">, cleanup?: CleanupFn): Entity<K> => {
         const uuid = UuidPool.uuidMap.reserve();
-        const uuidComponent = {
-            uuid: uuid,
-            alive: true,
-            cleanup: cleanup,
-        };
         const withUuid = {
             ...entity,
+            uuid: uuid,
+            isAlive: true,
+            cleanup: cleanup,
             components: {
                 ...entity.components,
-                uuid: uuidComponent,
             },
-        } as Entity<K | "uuid">;
+        };
         UuidPool.uuidMap.addReserved(uuid, withUuid);
         return withUuid;
     },
 
-    release: (entity: Entity<"uuid">): void => {
-        const uuidComponent = entity.components.uuid;
-        uuidComponent.alive = false;
-        const {uuid, cleanup} = uuidComponent;
+    release: (entity: Entity<never>): void => {
+        entity.isAlive = false;
 
-        cleanup?.(entity);
+        entity.cleanup?.(entity);
 
-        if (UuidPool.uuidMap.has(uuid)) {
-            UuidPool.uuidMap.remove(uuid);
+        if (UuidPool.uuidMap.has(entity.uuid)) {
+            UuidPool.uuidMap.remove(entity.uuid);
         }
     },
 
-    get: (uuid: number): Entity<"uuid"> | undefined => {
+    get: (uuid: number): Entity<never> | undefined => {
         return UuidPool.uuidMap.get(uuid);
     }
 };

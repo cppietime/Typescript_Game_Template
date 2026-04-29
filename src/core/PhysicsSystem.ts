@@ -24,8 +24,8 @@ type SapHandle = {
     bottom: SapEdge,
 };
 
-type ECU = Entity<"collision" | "uuid">;
-type ECUR = Entity<"collision" | "uuid" | "rect">;
+type ECU = Entity<"collision">;
+type ECUR = Entity<"collision" | "rect">;
 
 type CollisionState = {
     candidatePairs: [number, number][],
@@ -112,14 +112,14 @@ export class PhysicsSystem {
     }
 
     static colliderTimeVel(ent: ECUR, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
-        const time = localTime.get(ent.components.uuid.uuid)!;
+        const time = localTime.get(ent.uuid)!;
         const velocity = entityHas(ent, "velocity") ? ent.components.velocity : {x: 0, y: 0};
         return {time: time, velocity: {x: velocity.x * deltaTime, y: velocity.y * deltaTime}};
     }
 
     static colliderStartingPos(ent: ECUR, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
         const currentPos = ent.components.rect.origin;
-        const t = startTime - localTime.get(ent.components.uuid.uuid)!;
+        const t = startTime - localTime.get(ent.uuid)!;
         return {
             x: currentPos.x + t * velocity.x,
             y: currentPos.y + t * velocity.y,
@@ -128,7 +128,7 @@ export class PhysicsSystem {
 
     static collisionsFromPair(pair: [number, number], localTime: Map<number, number>, deltaTime: number): CollisionEvent[] {
         const entities = pair.map(id => UuidPool.get(id));
-        const noneMissing = (es: (Entity<"uuid"> | undefined)[]): es is [ECUR, ECUR] =>
+        const noneMissing = (es: (Entity<never> | undefined)[]): es is [ECUR, ECUR] =>
             !es.some(e => e == undefined || !entityHas(e, "collision") || !entityHas(e, "rect"));
         if (!noneMissing(entities)) {
             return [];
@@ -187,7 +187,7 @@ export class PhysicsSystem {
     static readonly EPSILON = 5e-2; // Design question. Experimental?
     static resolveCollisionFor(entity: ECUR, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
         if (entityHas(entity, "velocity")) {
-            const ellapsed = (collision.time - (localTime.get(entity.components.uuid.uuid) ?? 0)) * deltaTime;
+            const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime;
             const vel = entity.components.velocity;
             entity.components.rect.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
             entity.components.rect.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
@@ -215,11 +215,11 @@ export class PhysicsSystem {
         const deadColliders: Set<number> = new Set();
         for (const colliderId of this.colliderIds) {
             const entity = UuidPool.get(colliderId);
-            if (entity === undefined || !entityHas(entity, "collision") || !entityHas(entity, "rect") || !entity.components.uuid.alive) {
+            if (entity === undefined || !entityHas(entity, "collision") || !entityHas(entity, "rect") || !entity.isAlive) {
                 deadColliders.add(colliderId);
                 continue;
             }
-            this.collisionState.localTime.set(entity.components.uuid.uuid, 0);
+            this.collisionState.localTime.set(entity.uuid, 0);
             CollisionModule.updateCollisions(this, entity);
         }
 
@@ -267,8 +267,8 @@ export class PhysicsSystem {
                 PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime);
                 PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime);
                 
-                this.collisionState.localTime.set(selfEnt.components.uuid.uuid, nextCollision.time);
-                this.collisionState.localTime.set(triggerEnt.components.uuid.uuid, nextCollision.time);
+                this.collisionState.localTime.set(selfEnt.uuid, nextCollision.time);
+                this.collisionState.localTime.set(triggerEnt.uuid, nextCollision.time);
 
                 // Invalidate all remaining collisions of both entities
                 const selfEvents = this.collisionState.involvedEvents.get(nextCollision.self.entityId)!;

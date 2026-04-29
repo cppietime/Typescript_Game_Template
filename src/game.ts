@@ -113,14 +113,14 @@ export class Game {
             }
         });
 
-        this.physicsSystem.addCollider(this.player.components.uuid.uuid);
+        this.physicsSystem.addCollider(this.player.uuid);
 
         const prop = DecorModule.createDecor(this);
         prop.components.rect.origin = {x: 400.5, y: 144};
-        this.physicsSystem.addCollider(prop.components.uuid.uuid);
+        this.physicsSystem.addCollider(prop.uuid);
         renderGroup.add(prop);
         prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: prop.components.uuid.uuid,
+            entityId: prop.uuid,
             isSolid: true,
             layers: new Set([1]),
             mask: new Set([1]),
@@ -132,10 +132,10 @@ export class Game {
 
         const trigger = DecorModule.createDecor(this, false);
         trigger.components.rect.origin = {x: 220, y: 544};
-        this.physicsSystem.addCollider(trigger.components.uuid.uuid);
+        this.physicsSystem.addCollider(trigger.uuid);
         renderGroup.add(trigger);
         trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: trigger.components.uuid.uuid,
+            entityId: trigger.uuid,
             isSolid: false,
             layers: new Set([]),
             mask: new Set([1]),
@@ -147,10 +147,10 @@ export class Game {
 
         const triggered = DecorModule.createDecor(this, false);
         triggered.components.rect.origin = {x: 300, y: 300};
-        this.physicsSystem.addCollider(triggered.components.uuid.uuid);
+        this.physicsSystem.addCollider(triggered.uuid);
         renderGroup.add(triggered);
         triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: triggered.components.uuid.uuid,
+            entityId: triggered.uuid,
             isSolid: false,
             layers: new Set([0]),
             mask: new Set([]),
