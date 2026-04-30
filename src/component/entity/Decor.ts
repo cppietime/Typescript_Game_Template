@@ -6,7 +6,7 @@ import type { OriginEntity, SizeEntity, VelocityEntity } from "../physics/Physic
 import type { TickComponent, TickEntity } from "../physics/Tick.js";
 import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
 import type { Entity } from "./Entity.js";
-import { UuidPool } from "./Uuid.js";
+import { UNASSIGNED, UuidPool } from "./Uuid.js";
 
 export type Decor = RenderEntity & TickEntity & CollisionEntity & SizeEntity & VelocityEntity & {
     components: {extra: boolean}
@@ -17,7 +17,7 @@ const DECOR_SPEED = 400;
 export const DecorModule = {
     createDecor: (game: Game, solid: boolean = true): Decor => {
         const collisionSets: CollisionSet[] = []
-        const decor: Decor = UuidPool.withUuid({
+        const decor: Decor = {
             game: game,
             components: {
                 renderable: RenderModule.staticSpriteRenderer({
@@ -37,7 +37,9 @@ export const DecorModule = {
                 tick: DecorModule.updateDecorTest as TickComponent,
                 velocity: {x: 0, y: 0},
             },
-        });
+            uuid: UNASSIGNED,
+            isAlive: true,
+        };
         return decor;
     },
 

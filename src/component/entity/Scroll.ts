@@ -6,20 +6,25 @@ import type { Vec2 } from '../../util/Geometry.js';
 import { hasSize, type OriginEntity, type SizeEntity } from '../physics/Physical.js';
 import { type RenderEntity, type RenderFn, RenderModule } from '../render/RenderComponent.js';
 import type { Entity } from './Entity.js';
-import { UuidPool } from './Uuid.js';
+import { UNASSIGNED, UuidPool } from './Uuid.js';
 
 export type ScrollingBackground = RenderEntity & OriginEntity;
 
 export const ScrollModule = {
     create: (game: Game, sprite: Sprite): ScrollingBackground & SizeEntity => {
-        return UuidPool.withUuid({
+        return {
             game: game,
             components: {
                 origin: {x: 300, y: 0},
                 size: {x: 1280, y: 720},
-                renderable: RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => ScrollModule.render(renderSystem, data as ScrollingBackground, sprite))
+                renderable: RenderModule.fromCallback(
+                    (renderSystem: RenderSystem, data: Entity<any>) => ScrollModule.render(renderSystem, data as ScrollingBackground, sprite),
+                    -1000
+                )
             },
-        });
+            uuid: UNASSIGNED,
+            isAlive: true,
+        };
     },
 
     render: (renderSystem: RenderSystem, data: ScrollingBackground, sprite: Sprite) => {

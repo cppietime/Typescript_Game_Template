@@ -3,30 +3,16 @@ import type { Entity } from "./Entity.js";
 
 export type CleanupFn = (data: Entity<{}>) => void;
 
-export type UuidComponent = {
-    uuid: number,
-    alive: boolean,
-    cleanup?: CleanupFn | undefined,
-};
-
 export const UNASSIGNED = -1;
 
 export const UuidPool = {
     uuidMap: new IdMap<Entity<{}>>(),
 
-    withUuid: <T extends Entity<any>>(entity: Omit<T, "uuid" | "cleanup" | "isAlive">, cleanup?: CleanupFn): T => {
+    assignUuid: (entity: Entity<any>) => {
         const uuid = UuidPool.uuidMap.reserve();
-        const withUuid = {
-            ...entity,
-            uuid: uuid,
-            isAlive: true,
-            cleanup: cleanup,
-            components: {
-                ...entity.components,
-            },
-        };
-        UuidPool.uuidMap.addReserved(uuid, withUuid);
-        return withUuid as T;
+        entity.uuid = uuid;
+        UuidPool.uuidMap.addReserved(uuid, entity);
+        console.log('Add uuid', uuid);
     },
 
     release: (entity: Entity<{}>): void => {
@@ -37,6 +23,8 @@ export const UuidPool = {
         if (UuidPool.uuidMap.has(entity.uuid)) {
             UuidPool.uuidMap.remove(entity.uuid);
         }
+
+        console.log('Release uuid', entity.uuid);
     },
 
     get: (uuid: number): Entity<{}> | undefined => {

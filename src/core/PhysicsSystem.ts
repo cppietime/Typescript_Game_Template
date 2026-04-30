@@ -1,5 +1,5 @@
 import { entityHas, type Entity } from "../component/entity/Entity.js";
-import { UuidPool } from "../component/entity/Uuid.js";
+import { UNASSIGNED, UuidPool } from "../component/entity/Uuid.js";
 import { CollisionModule, hasCollision, Normal, type CollisionEntity, type CollisionEvent } from "../component/physics/Collision.js";
 import { hasOrigin, hasVelocity, type OriginEntity } from "../component/physics/Physical.js";
 import type { Game } from "../game.js";
@@ -7,6 +7,7 @@ import { insertionSort } from "../util/Algorithm.js";
 import { CustomSet } from "../util/CustomSet.js";
 import { RectModule, sweptAABB, type CornerRect, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";
 import { MinHeap } from "../util/MinHeap.js";
+import type { ContainsEntityFn, EntitySystem, EntitySystemPredicate } from "./EntitySystem.js";
 
 type SapEdge = {
     pos: number,
@@ -45,7 +46,7 @@ function resetCollisionState(state: CollisionState) {
     state.firedTriggers.clear();
 }
 
-export class PhysicsSystem {
+export class PhysicsSystem implements EntitySystem {
     // These two lists store the edges of the bounding box of possible collisions.
     // I.e. if the object is moving, it should encompass everything between current and proposed position.
     readonly edgesX: SapEdge[] = [];
@@ -62,6 +63,26 @@ export class PhysicsSystem {
         firedTriggers: CustomSet.pairSet(),
     };
 
+    predicate(entity: Entity<any>): boolean {
+        return hasCollision(entity);
+    }
+
+    addEntity(entity: Entity<any>) {
+        if (!hasCollision(entity)) {
+            return;
+        }
+        entity.components.collision.collisionSets.forEach(set => set.entityId = entity.uuid);
+        this.addCollider(entity.uuid);
+    }
+
+    removeEntity(uuid: number) {
+        this.removeCollider(uuid);
+    }
+
+    containsEntity(uuid: number): boolean {
+        return this.colliderIds.has(uuid);
+    }
+
     addCollider(uuid: number) {
         const left: SapEdge = {pos: 0, isBeginning: true, uuid: uuid};
         const right: SapEdge = {pos: 0, isBeginning: false, uuid: uuid};
@@ -73,18 +94,36 @@ export class PhysicsSystem {
         this.colliderIds.add(uuid);
     }
 
-    getHandle(uuid: number) {
-        return this.sapHandles.get(uuid);
+    removeCollider(uuid: number) {
+        const handle = this.sapHandles.get(uuid);
+        if (handle === undefined) {
+            return;
+        }
+        handle.left.uuid = UNASSIGNED;
+        handle.right.uuid = UNASSIGNED;
+        handle.top.uuid = UNASSIGNED;
+        handle.bottom.uuid = UNASSIGNED;
+        handle.left.pos = Infinity;
+        handle.right.pos = Infinity;
+        handle.top.pos = Infinity;
+        handle.bottom.pos = Infinity;
+        this.sapHandles.delete(uuid);
+        this.colliderIds.delete(uuid);
     }
 
-    removeCollider(uuid: number) {
-        this.sapHandles.delete(uuid);
+    getHandle(uuid: number) {
+        return this.sapHandles.get(uuid);
     }
 
     static sweepAndPrune(edges: SapEdge[]) {
         const activeSets: Set<number> = new Set();
         const candidates: CustomSet<[number, number]> = CustomSet.pairSet();
-        for (const {isBeginning, uuid} of edges) {
+        for (let i = 0; i < edges.length; i++) {
+            const {uuid, isBeginning} = edges[i]!;
+            if (uuid === UNASSIGNED) {
+                edges.length = i;
+                break;
+            }
             if (isBeginning) {
                 activeSets.add(uuid);
             } else {
@@ -210,11 +249,9 @@ export class PhysicsSystem {
         resetCollisionState(this.collisionState);
 
         // Update bounding boxes
-        const deadColliders: Set<number> = new Set();
         for (const colliderId of this.colliderIds) {
             const entity = UuidPool.get(colliderId);
             if (entity === undefined || !hasCollision(entity) || !entity.isAlive) {
-                deadColliders.add(colliderId);
                 continue;
             }
             this.collisionState.localTime.set(entity.uuid, 0);
@@ -223,10 +260,6 @@ export class PhysicsSystem {
 
         insertionSort(this.edgesX, sapEdgeCmp);
         insertionSort(this.edgesY, sapEdgeCmp);
-
-        for (const deadCollider of deadColliders) {
-            this.colliderIds.delete(deadCollider);
-        }
 
         // Sweep and prune
         // X

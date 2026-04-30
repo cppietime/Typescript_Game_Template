@@ -3,47 +3,75 @@ import { ImageSystem } from "./ImageSystem.js";
 import * as constants from '../data/constants.js';
 import type { TlRect, Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
-import type { RenderEntity } from "../component/render/RenderComponent.js";
+import { hasRenderable, type RenderEntity } from "../component/render/RenderComponent.js";
+import type { EntitySystem } from "./EntitySystem.js";
+import type { Entity } from "../component/entity/Entity.js";
 
 export class RenderGroup {
     static RenderGroups = new IdMap<RenderGroup>();
     id: number;
-    renderables = new IdMap<RenderEntity>();
+    renderables: RenderEntity[] = [];
     active: boolean = true;
+    dirty: boolean = true;
+    indices = new Map<number, number>();
 
     constructor() {
         this.id = RenderGroup.RenderGroups.add(this);
     }
 
+    markDirty() {
+        this.dirty = true;
+    }
+
+    clean() {
+        if (!this.dirty) {
+            return;
+        }
+        this.renderables.sort((a, b) => a.components.renderable.z - b.components.renderable.z);
+        this.renderables.forEach((r, idx) => this.indices.set(r.uuid, idx));
+        this.dirty = false;
+    }
+
     clear() {
-        this.renderables.clear();
+        this.renderables.length = 0;
+        this.indices.clear();
+        this.markDirty();
     }
 
-    add(renderable: RenderEntity, index?: number): number {
-        return this.renderables.add(renderable);
-    }
-
-    remove(index: number) {
-        this.renderables.remove(index);
+    remove(uuid: number) {
+        this.clean();
+        const idx = this.indices.get(uuid);
+        this.indices.delete(uuid);
+        if (idx === undefined) {
+            return;
+        }
+        this.renderables[idx] = this.renderables[this.renderables.length - 1]!;
+        this.renderables.pop();
+        this.markDirty();
     }
 
     render(renderSystem: RenderSystem) {
         if (!this.active) {
             return;
         }
-        for (const renderable of this.renderables.values()) {
-            renderable.components.renderable.render(renderSystem, renderable);
+        this.clean();
+        for (const renderable of this.renderables) {
+            if (renderable.isAlive && renderable.components.renderable.visible) {
+                renderable.components.renderable.render(renderSystem, renderable);
+            }
         }
     }
 }
 
-export class RenderSystem {
+export class RenderSystem implements EntitySystem {
     canvas: HTMLCanvasElement;
     canvasWidth: number = 0;
     canvasHeight: number = 0;
     ctx: CanvasRenderingContext2D;
     spriteSystem = new ImageSystem();
-    renderGroups = new Map<number, RenderGroup>();
+    //renderGroups: RenderGroup[] = [];
+    zSorted: RenderEntity[] = [];
+    uuidToIdx = new Map<number, number>();
     clearColor: string = '#000';
     offset: Vec2 = {x: 0, y: 0};
 
@@ -55,8 +83,32 @@ export class RenderSystem {
         this.reset();
     }
 
+    predicate(entity: Entity<any>): boolean {
+        return hasRenderable(entity);
+    }
+
+    addEntity(entity: Entity<any>) {
+        if (!hasRenderable(entity)) {
+            return;
+        }
+        this.uuidToIdx.set(entity.uuid, this.zSorted.length);
+        this.zSorted.push(entity);
+    }
+
+    removeEntity(uuid: number) {
+        const idx = this.uuidToIdx.get(uuid);
+        this.uuidToIdx.delete(uuid);
+        if (idx === undefined) {
+            return;
+        }
+        this.zSorted.splice(idx, 1);
+    }
+
+    containsEntity(uuid: number): boolean {
+        return this.uuidToIdx.has(uuid);
+    }
+
     reset() {
-        this.renderGroups.clear();
     }
 
     onResize() {
@@ -113,18 +165,17 @@ export class RenderSystem {
         this.ctx.drawImage(img, sprite.x0, sprite.y0, sprite.width, sprite.height, x, y, width, height);
     }
 
-    getRenderGroup(index: number): RenderGroup {
-        if (!this.renderGroups.has(index)) {
-            this.renderGroups.set(index, new RenderGroup());
-        }
-        return this.renderGroups.get(index)!;
-    }
-
     render() {
         this.clear(this.clearColor);
 
-        for (const renderGroup of this.renderGroups.values()) {
-            renderGroup.render(this);
+        this.zSorted.sort((a, b) => a.components.renderable.z - b.components.renderable.z);
+        this.zSorted.forEach((r, idx) => this.uuidToIdx.set(r.uuid, idx));
+
+        for (const renderable of this.zSorted) {
+            if (!renderable.components.renderable.visible) {
+                continue;
+            }
+            renderable.components.renderable.render(this, renderable);
         }
     }
     

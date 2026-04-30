@@ -8,7 +8,7 @@ import type { OriginEntity, SizeEntity, VelocityEntity } from "../physics/Physic
 import type { TickComponent, TickEntity } from "../physics/Tick.js";
 import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
 import type { Entity } from "./Entity.js";
-import { UuidPool, type CleanupFn } from "./Uuid.js";
+import { UNASSIGNED, UuidPool, type CleanupFn } from "./Uuid.js";
 
 type PlayerComponent = {
     pulse: number,
@@ -33,11 +33,11 @@ export const PlayerModule = {
 
     create: (game: Game): PlayerEntity => {
         const collisionSets: CollisionSet[] = []
-        const player: PlayerEntity = UuidPool.withUuid({
+        const player: PlayerEntity = {
             game: game,
             components: {
                 renderable:
-                    RenderModule.fromCallback(PlayerModule.render),
+                    RenderModule.fromCallback(PlayerModule.render, 5),
                 origin: {x: 32, y: 32},
                 size: {x: 64, y: 64},
                 tick: PlayerModule.update as TickComponent,
@@ -49,8 +49,11 @@ export const PlayerModule = {
                 collision: {
                     collisionSets: collisionSets
                 }
-            }
-        }, PlayerModule.cleanup as CleanupFn);
+            },
+            cleanup: PlayerModule.cleanup as CleanupFn,
+            uuid: UNASSIGNED,
+            isAlive: true,
+        };
         collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: player.uuid,
             isSolid: true,
@@ -59,13 +62,15 @@ export const PlayerModule = {
             rects: [{
                 origin: {x: 0, y: 0}, size: {x: 64, y: 64}
             }],
-            onCollide: (collision: CollisionEvent) => console.log('Trigger'),
+            onCollide: (collision: CollisionEvent) => {
+                console.log('Trigger')
+                player.components.renderable.visible = true;
+            },
         }));
         return player;
     },
 
     cleanup: (data: PlayerEntity) => {
-        RenderModule.cleanupRenderHandles(data.game.renderSystem, data.components.renderable);
         CollisionModule.cleanup(data.game, data);
     },
 

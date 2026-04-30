@@ -15,6 +15,33 @@ import type { Sprite } from './data/sprites.js';
 import type { Vec2, OriginRect } from './util/Geometry.js';
 import { RectModule } from './util/Geometry.js';
 import {ScrollModule} from './component/entity/Scroll.js';
+import type { EntitySystem } from "./core/EntitySystem.js";
+import type { Entity, PreEntity } from "./component/entity/Entity.js";
+import { UNASSIGNED, UuidPool } from "./component/entity/Uuid.js";
+
+enum CommandType {
+    CREATE,
+    DESTROY,
+    ADD,
+    REMOVE,
+};
+
+type Command = {
+    type: CommandType.CREATE,
+    entity: Entity<any>,
+} | {
+    type: CommandType.DESTROY,
+    uuid: number,
+} | {
+    type: CommandType.ADD,
+    uuid: number,
+    key: string,
+    component: any,
+} | {
+    type: CommandType.REMOVE,
+    uuid: number,
+    key: string,
+};
 
 export class Game {
     canvas: HTMLCanvasElement;
@@ -24,6 +51,11 @@ export class Game {
     uiSystem: UiSystem;
     physicsSystem: PhysicsSystem;
     updateSystem: UpdateSystem;
+
+    entitySystems: EntitySystem[] = [];
+
+    commandQueue: Command[] = [];
+    dirtyEntities = new Set<number>();
 
     paused = false;
 
@@ -38,6 +70,12 @@ export class Game {
         this.uiSystem = new UiSystem(this);
         this.physicsSystem = new PhysicsSystem();
         this.updateSystem = new UpdateSystem();
+
+        this.entitySystems.push(
+            this.updateSystem,
+            this.physicsSystem,
+            this.renderSystem,
+        );
 
         this.lastTime = Date.now() / 1000;
 
@@ -78,6 +116,76 @@ export class Game {
         this.inputSystem.registerTrigger(input, callback);
     }
 
+    createEntity(entity: Entity<any>) {
+        this.commandQueue.push({type: CommandType.CREATE, entity});
+    }
+
+    destroyEntity(uuid: number) {
+        this.commandQueue.push({type: CommandType.DESTROY, uuid});
+    }
+
+    addComponent(uuid: number, key: string, component: any) {
+        this.commandQueue.push({type: CommandType.ADD, uuid, key, component});
+    }
+
+    removeComponent(uuid: number, key: string) {
+        this.commandQueue.push({type: CommandType.REMOVE, uuid, key});
+    }
+
+    syncEntity(uuid: number) {
+        const entity = UuidPool.get(uuid);
+        if (entity === undefined) {
+            return;
+        }
+        for (const system of this.entitySystems) {
+            const shouldBePresent = system.predicate(entity) && entity.isAlive;
+            const isPresent = system.containsEntity(uuid);
+            if (shouldBePresent && !isPresent) {
+                system.addEntity(entity);
+            } else if (isPresent && !shouldBePresent) {
+                system.removeEntity(uuid);
+            }
+        }
+        if (!entity.isAlive) {
+            UuidPool.release(entity);
+        }
+    }
+
+    flushCommands() {
+        this.dirtyEntities.clear();
+        for (const command of this.commandQueue) {
+            this.runCommand(command);
+        }
+        this.commandQueue.length = 0;
+        this.dirtyEntities.forEach((entity) => this.syncEntity(entity));
+    }
+
+    runCommand(command: Command) {
+        switch (command.type) {
+            case CommandType.CREATE:
+                {
+                    const entity = command.entity;
+                    UuidPool.assignUuid(entity);
+                    this.dirtyEntities.add(entity.uuid);
+                    break;
+                }
+            case CommandType.DESTROY:
+                {
+                    const entity = UuidPool.get(command.uuid);
+                    if (entity === undefined) {
+                        break;
+                    }
+                    entity.isAlive = false;
+                    this.dirtyEntities.add(command.uuid);
+                    break;
+                }
+            case CommandType.ADD:
+                break;
+            case CommandType.REMOVE:
+                break;
+        }
+    }
+
     player?: PlayerEntity;
     setupTestSprite() {
         const sprite: Sprite = {
@@ -90,14 +198,13 @@ export class Game {
         };
 
         this.player = PlayerModule.create(this);
+        this.createEntity(this.player);
 
         const joystick = JoystickModule.createDpad8(this);
-
-        const bgGroup = this.renderSystem.getRenderGroup(0);
-
-        const renderGroup = this.renderSystem.getRenderGroup(1);
-        renderGroup.add(this.player);
-        renderGroup.add(joystick);
+        this.createEntity(joystick);
+        
+        //this.renderSystem.addEntity(this.player);
+        //this.renderSystem.addEntity(joystick);
 
         this.renderSystem.clearColor = '#008800';
 
@@ -113,12 +220,12 @@ export class Game {
             }
         });
 
-        this.physicsSystem.addCollider(this.player.uuid);
+        //this.physicsSystem.addEntity(this.player);
 
         const prop = DecorModule.createDecor(this);
         prop.components.origin = {x: 400.5, y: 144};
-        this.physicsSystem.addCollider(prop.uuid);
-        renderGroup.add(prop);
+        //this.physicsSystem.addEntity(prop);
+        //this.renderSystem.addEntity(prop);
         prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: prop.uuid,
             isSolid: true,
@@ -129,11 +236,12 @@ export class Game {
             ],
             onCollide: () => console.log('Solid Collision')
         }));
+        this.createEntity(prop);
 
         const trigger = DecorModule.createDecor(this, false);
         trigger.components.origin = {x: 220, y: 544};
-        this.physicsSystem.addCollider(trigger.uuid);
-        renderGroup.add(trigger);
+        //this.physicsSystem.addEntity(trigger);
+        //this.renderSystem.addEntity(trigger);
         trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: trigger.uuid,
             isSolid: false,
@@ -142,13 +250,20 @@ export class Game {
             rects: [
                 {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
             ],
-            onCollide: () => console.log('Nonsolid Collision')
+            onCollide: () => {
+                console.log('Nonsolid Collision');
+                this.destroyEntity(trigger.uuid);
+                const r = this.player?.components.renderable;
+                if (r !== undefined) r.visible = false;
+            }
         }));
+        this.createEntity(trigger);
+        console.log('Trigger id', trigger.uuid);
 
         const triggered = DecorModule.createDecor(this, false);
         triggered.components.origin = {x: 300, y: 300};
-        this.physicsSystem.addCollider(triggered.uuid);
-        renderGroup.add(triggered);
+        //this.physicsSystem.addEntity(triggered);
+        //this.renderSystem.addEntity(triggered);
         triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
             entityId: triggered.uuid,
             isSolid: false,
@@ -158,6 +273,7 @@ export class Game {
                 {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
             ],
         }));
+        this.createEntity(triggered);
 
         const bg = ScrollModule.create(this, {
             image: 'background',
@@ -167,16 +283,18 @@ export class Game {
             height: 720,
             color: '#ff0',
         });
-        bgGroup.add(bg);
+        this.createEntity(bg);
+        //this.renderSystem.addEntity(bg);
 
-        this.updateSystem.add(this.player);
-        this.updateSystem.add(prop);
-        this.updateSystem.add(trigger);
-        this.updateSystem.add(triggered);
+        //this.updateSystem.addEntity(this.player);
+        //this.updateSystem.addEntity(prop);
+        //this.updateSystem.addEntity(trigger);
+        //this.updateSystem.addEntity(triggered);
     }
 
     gameLoop() {
         this.update();
+        this.flushCommands();
         this.render();
 
         requestAnimationFrame(() => this.gameLoop());
@@ -195,7 +313,7 @@ export class Game {
         this.frames++;
         this.runTime += this.deltaTime;
         if (this.frames % 100 === 0) {
-            console.log(this.frames / this.runTime, 'FPS');
+            //console.log(this.frames / this.runTime, 'FPS');
         }
         if (this.paused) {
             return;

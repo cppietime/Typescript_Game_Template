@@ -2,7 +2,7 @@ import type { ClickState, InputRegion } from "../../core/InputSystem.js";
 import { State } from "../../data/inputs.js";
 import type { Game } from "../../game.js";
 import { entityHas, type Entity } from "../entity/Entity.js";
-import { UuidPool, type CleanupFn, type UuidComponent } from "../entity/Uuid.js";
+import { UNASSIGNED, UuidPool, type CleanupFn } from "../entity/Uuid.js";
 import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
 import { type OriginRect, RectModule } from "../../util/Geometry.js";
 import type { RenderSystem } from "../../core/RenderSystem.js";
@@ -50,7 +50,7 @@ export const JoystickModule = {
             {x: 55, y: 670, color: '#00f'},
             {x: 90, y: 670, color: '#0ff'},
         ];
-        return UuidPool.withUuid({
+        return {
             game: game,
             components: {
                 renderable: RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => {
@@ -69,14 +69,15 @@ export const JoystickModule = {
                 region: rgnId,
                 ...RectModule.TopLeft.toOrigin({topLeft: {x: 20, y: 600}, size: {x: 100, y: 100}}),
             },
-        }, JoystickModule.cleanup as CleanupFn) satisfies Joystick;
+            cleanup: JoystickModule.cleanup as CleanupFn,
+            uuid: UNASSIGNED,
+            isAlive: true,
+        } satisfies Joystick;
     },
 
     cleanup: (data: Joystick) => {
         const rgnId = data.components.region as number;
         const inputRegions = data.game.inputSystem.inputRegions;
         inputRegions.remove(rgnId);
-        
-        RenderModule.cleanupRenderHandles(data.game.renderSystem, data.components.renderable);
     },
 };

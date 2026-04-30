@@ -2,7 +2,7 @@ import type { Game } from "../../game.js";
 import type { OriginRect, Vec2 } from "../../util/Geometry.js";
 import type { CollisionComponent } from "../physics/Collision.js";
 import type { RenderComponent } from "../render/RenderComponent.js";
-import type { CleanupFn, UuidComponent } from "./Uuid.js";
+import type { CleanupFn } from "./Uuid.js";
 
 export type Entity<C extends Record<string, any>> = {
     game: Game,
@@ -11,6 +11,8 @@ export type Entity<C extends Record<string, any>> = {
     cleanup?: CleanupFn | undefined,
     components: C,
 };
+
+export type PreEntity = Omit<Entity<any>, "game" | "uuid" | "isAlive">;
 
 type ComponentKeys<T extends Entity<any>> = T extends Entity<infer C> ? keyof C : never;
 

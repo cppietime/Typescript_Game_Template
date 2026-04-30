@@ -1,13 +1,8 @@
 import type { RenderGroup, RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
 import { RectModule } from "../../util/Geometry.js";
-import type { Entity, With } from "../entity/Entity.js";
+import { entityHas, type Entity, type With } from "../entity/Entity.js";
 import {hasSize, type OriginEntity} from "../physics/Physical.js";
-
-export type RenderHandle = {
-    groupId: number,
-    renderId: number,
-};
 
 export type RenderFn = (renderSystem: RenderSystem, data: Entity<any>) => void;
 
@@ -15,19 +10,20 @@ export type RenderFn = (renderSystem: RenderSystem, data: Entity<any>) => void;
 export type RenderComponent = {
     render: RenderFn,
     visible: boolean,
-    handles: RenderHandle[],
+    z: number,
 };
 
 type WithRenderComponent = With<RenderComponent, "renderable">;
 export type RenderEntity = Entity<WithRenderComponent>;
+export const hasRenderable = (entity: Entity<any>): entity is RenderEntity => entityHas<RenderEntity>(entity, ["renderable"]);
 
 export const RenderModule = {
 
-    fromCallback: <T extends RenderEntity>(renderFn: RenderFn): RenderComponent => {
+    fromCallback: <T extends RenderEntity>(renderFn: RenderFn, z: number = 0): RenderComponent => {
         return {
             render: renderFn,
             visible: true,
-            handles: [],
+            z: z,
         };
     },
 
@@ -48,17 +44,6 @@ export const RenderModule = {
         return RenderModule.fromCallback((renderSystem: RenderSystem, data: Entity<any>) => {
                 renderers.forEach(renderer => renderer.render(renderSystem, data));
             });
-    },
-
-    addToRenderGroup: (renderGroup: RenderGroup, entity: RenderEntity) => {
-        const id = renderGroup.add(entity);
-        entity.components.renderable.handles.push({groupId: renderGroup.id, renderId: id});
-    },
-
-    cleanupRenderHandles: (renderSystem: RenderSystem, renderComponent: RenderComponent) => {
-        renderComponent.handles.forEach((handle) => {
-            renderSystem.getRenderGroup(handle.groupId).remove(handle.renderId);
-        });
     },
 
 };
