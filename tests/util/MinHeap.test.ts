@@ -1,4 +1,4 @@
-import { MinHeap } from "../../src/util/MinHeap";
+import { MinHeap } from "../../src/engine/util/MinHeap.js";
 
 describe ('Min heap', () => {
     test ('Heap sort', () => {

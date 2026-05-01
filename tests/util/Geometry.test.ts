@@ -1,5 +1,5 @@
-import { Normal } from "../../src/component/physics/Collision.js";
-import { createVec2, sweptAABB, type CornerRect, type SweepResult, type Vec2 } from "../../src/util/Geometry.js";
+import { Normal } from "../../src/engine/components/Collision.js";
+import { createVec2, sweptAABB, type CornerRect, type SweepResult, type Vec2 } from "../../src/engine/util/Geometry.js";
 
 describe('Default factories', () => {
     test('Create default vec2', () => {

@@ -6,6 +6,7 @@ import { PlayerModule } from "./entities/Player.js";
 import { DecorModule } from "./entities/template/Decor.js";
 import { ScrollModule } from "./entities/template/Scroll.js";
 import { JoystickModule } from "./entities/ui/Joystick.js";
+import { State, Trigger } from "./data/Inputs.js";
 
 const main = (): void => {
     console.log('Main');
@@ -20,6 +21,53 @@ const onLoad = (): void => {
 };
 
 function setupGame(game: Game) {
+    const inputSystem = game.inputSystem;
+    window.addEventListener('keydown', (ev: KeyboardEvent) => {
+        switch (ev.key.toLowerCase()) {
+            case 'escape':
+                inputSystem.triggerInput(Trigger.PAUSE);
+                break;
+            
+            case 'w':
+            case 'arrowup':
+                inputSystem.setState(State.UP, true);
+                break;
+            case 'a':
+            case 'arrowleft':
+                inputSystem.setState(State.LEFT, true);
+                break;
+            case 's':
+            case 'arrowdown':
+                inputSystem.setState(State.DOWN, true);
+                break;
+            case 'd':
+            case 'arrowright':
+                inputSystem.setState(State.RIGHT, true);
+                break;
+        }
+    });
+
+    window.addEventListener('keyup', (ev: KeyboardEvent) => {
+        switch (ev.key.toLowerCase()) {
+            case 'w':
+            case 'arrowup':
+                inputSystem.setState(State.UP, false);
+                break;
+            case 'a':
+            case 'arrowleft':
+                inputSystem.setState(State.LEFT, false);
+                break;
+            case 's':
+            case 'arrowdown':
+                inputSystem.setState(State.DOWN, false);
+                break;
+            case 'd':
+            case 'arrowright':
+                inputSystem.setState(State.RIGHT, false);
+                break;
+        }
+    });
+
     const player = PlayerModule.create(game);
     game.createEntity(player);
 

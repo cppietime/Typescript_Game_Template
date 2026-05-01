@@ -1,4 +1,4 @@
-import { binarySearch, insertionSort } from '../../src/util/Algorithm';
+import { binarySearch, insertionSort } from '../../src/engine/util/Algorithm';
 
 describe('test insertion sort', () => {
     test('test insertion sort', () => {

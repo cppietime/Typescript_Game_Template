@@ -3,7 +3,6 @@ import {TouchType} from "../../engine/data/types/Inputs.js";
 import type { Game } from "../Game.js";
 import { createOriginRect, createVec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
-import type { SapEdge, SapHandle } from "./PhysicsSystem.js";
 
 export type InputRegion = {
     predicate: (click: ClickState, regionStates: Set<State>) => boolean
@@ -24,9 +23,6 @@ export class InputSystem {
     private readonly activeStates: Set<State> = new Set();
     private readonly currentClick: ClickState = {x: 0, y: 0, down: false, initial: false};
     private readonly regionStates: Set<State> = new Set();
-    private readonly edgesX: SapEdge[] = [];
-    private readonly edgesY: SapEdge[] = [];
-    private readonly handles: SapHandle[] = [];
     
     inputRegions: IdMap<InputRegion> = new IdMap();
     touchListeners: IdMap<TouchListener> = new IdMap();
@@ -70,53 +66,6 @@ export class InputSystem {
     }
 
     setupInputs() {
-            // Keyboard inputs
-            window.addEventListener('keydown', (ev: KeyboardEvent) => {
-                switch (ev.key.toLowerCase()) {
-                    case 'escape':
-                        this.triggerInput(Trigger.PAUSE);
-                        break;
-                    
-                    case 'w':
-                    case 'arrowup':
-                        this.setState(State.UP, true);
-                        break;
-                    case 'a':
-                    case 'arrowleft':
-                        this.setState(State.LEFT, true);
-                        break;
-                    case 's':
-                    case 'arrowdown':
-                        this.setState(State.DOWN, true);
-                        break;
-                    case 'd':
-                    case 'arrowright':
-                        this.setState(State.RIGHT, true);
-                        break;
-                }
-            });
-
-            window.addEventListener('keyup', (ev: KeyboardEvent) => {
-                switch (ev.key.toLowerCase()) {
-                    case 'w':
-                    case 'arrowup':
-                        this.setState(State.UP, false);
-                        break;
-                    case 'a':
-                    case 'arrowleft':
-                        this.setState(State.LEFT, false);
-                        break;
-                    case 's':
-                    case 'arrowdown':
-                        this.setState(State.DOWN, false);
-                        break;
-                    case 'd':
-                    case 'arrowright':
-                        this.setState(State.RIGHT, false);
-                        break;
-                }
-            });
-
             // Mouse/touch inputs
             this.game.canvas.addEventListener('mousedown', (ev: MouseEvent) => {
                 this.setClickPos(ev.offsetX, ev.offsetY);

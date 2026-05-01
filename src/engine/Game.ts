@@ -1,7 +1,7 @@
-import { JoystickModule } from '../game/entities/ui/Joystick.js';
-import { DecorModule } from '../game/entities/template/Decor.js';
-import { PlayerModule, type PlayerEntity } from '../game/entities/Player.js';
-import { CollisionModule, createCollisionSet } from './components/Collision.js';
+/**
+ * Starting point for games. Contains all systems and handles command queue.
+ */
+
 import { InputSystem } from './systems/InputSystem.js';
 import { PhysicsSystem } from './systems/PhysicsSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
@@ -9,13 +9,10 @@ import { UiSystem } from './systems/UiSystem.js';
 import { UpdateSystem } from './systems/UpdateSystem.js';
 import * as constants from '../game/data/Constants.js';
 import {Trigger} from '../game/data/Inputs.js';
-import type { Vec2, OriginRect } from './util/Geometry.js';
-import { createOriginRect, createTlRect, createVec2, GeometryModule } from './util/Geometry.js';
-import {ScrollModule} from '../game/entities/template/Scroll.js';
+import type { Vec2 } from './util/Geometry.js';
 import type { EntitySystem } from "./systems/EntitySystem.js";
 import type { Entity } from "./entity/Entity.js";
 import { UuidPool } from "./entity/Uuid.js";
-import { createOriginComponent } from "./components/Physical.js";
 
 enum CommandType {
     CREATE,
@@ -41,19 +38,22 @@ type Command = {
     key: string,
 };
 
+/**
+ * Container of systems and core game logic.
+ */
 export class Game {
-    canvas: HTMLCanvasElement;
+    readonly canvas: HTMLCanvasElement;
 
-    renderSystem: RenderSystem;
-    inputSystem: InputSystem;
-    uiSystem: UiSystem;
-    physicsSystem: PhysicsSystem;
-    updateSystem: UpdateSystem;
+    readonly renderSystem: RenderSystem;
+    readonly inputSystem: InputSystem;
+    readonly uiSystem: UiSystem;
+    readonly physicsSystem: PhysicsSystem;
+    readonly updateSystem: UpdateSystem;
 
-    entitySystems: EntitySystem[] = [];
+    private readonly entitySystems: EntitySystem[] = [];
 
-    commandQueue: Command[] = [];
-    dirtyEntities = new Set<number>();
+    private readonly commandQueue: Command[] = [];
+    private dirtyEntities = new Set<number>();
 
     paused = false;
 
@@ -80,7 +80,7 @@ export class Game {
         this.setupCanvas();
     }
     
-    setupCanvas() {
+    private setupCanvas() {
         
         this.canvas.width = constants.CANVAS_WIDTH;
         this.canvas.height = constants.CANVAS_HEIGHT;
@@ -99,35 +99,65 @@ export class Game {
         onResize();
     };
 
+    /**
+     * The game loses focus. E.g. pause menu.
+     */
     loseFocus() {
         this.uiSystem.pause();
     }
 
+    /**
+     * The game regains focus. E.g. reset delta time.
+     */
     gainFocus() {
         this.lastTime = Date.now() / 1000;
     }
 
+    /**
+     * Register something to occur when a trigger is tripped, such as a pause menu.
+     * @param input Trigger
+     * @param callback Function called on trigger
+     */
     registerTrigger(input: Trigger, callback: () => void) {
         this.inputSystem.registerTrigger(input, callback);
     }
 
+    /**
+     * Queue creation of an entity
+     * @param entity 
+     */
     createEntity(entity: Entity<any>) {
         this.commandQueue.push({type: CommandType.CREATE, entity});
     }
 
+    /**
+     * Queue destruction of an entity based on its UUID
+     * @param uuid
+     */
     destroyEntity(uuid: number) {
         this.commandQueue.push({type: CommandType.DESTROY, uuid});
     }
 
+    /**
+     * Queue addition of a new component to an entity
+     * @param uuid 
+     * @param key 
+     * @param component 
+     */
     addComponent(uuid: number, key: string, component: any) {
         this.commandQueue.push({type: CommandType.ADD, uuid, key, component});
     }
 
+    /**
+     * Queue removal of a component from an entity
+     * @param uuid
+     * @param key 
+     */
     removeComponent(uuid: number, key: string) {
         this.commandQueue.push({type: CommandType.REMOVE, uuid, key});
     }
 
-    syncEntity(uuid: number) {
+    private syncEntity(uuid: number) {
         const entity = UuidPool.get(uuid);
         if (entity === undefined) {
             return;
@@ -146,7 +176,7 @@ export class Game {
         }
     }
 
-    flushCommands() {
+    private flushCommands() {
         this.dirtyEntities.clear();
         for (const command of this.commandQueue) {
             this.runCommand(command);
@@ -155,7 +185,7 @@ export class Game {
         this.dirtyEntities.forEach((entity) => this.syncEntity(entity));
     }
 
-    runCommand(command: Command) {
+    private runCommand(command: Command) {
         switch (command.type) {
             case CommandType.CREATE:
                 {
@@ -185,7 +215,7 @@ export class Game {
         this.gameLoop();
     }
 
-    gameLoop() {
+    private gameLoop() {
         this.update();
         this.flushCommands();
         this.render();
@@ -200,7 +230,7 @@ export class Game {
 
     frames = 0;
     runTime = 0;
-    update() {
+    private update() {
         this.deltaTime = Date.now() / 1000 - this.lastTime;
         this.lastTime += this.deltaTime;
         this.frames++;
@@ -217,7 +247,7 @@ export class Game {
         this.physicsSystem.checkCollisions(this);
     }
 
-    render() {
+    private render() {
         this.renderSystem.render();
     }
 
