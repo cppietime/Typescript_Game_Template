@@ -1,6 +1,6 @@
-import type { RenderGroup, RenderSystem } from "../../core/RenderSystem.js";
+import type { RenderSystem } from "../../core/RenderSystem.js";
 import type { Sprite } from "../../data/sprites.js";
-import { RectModule } from "../../util/Geometry.js";
+import { GeometryModule } from "../../util/Geometry.js";
 import { entityHas, type Entity, type With } from "../entity/Entity.js";
 import {hasSize, type OriginEntity} from "../physics/Physical.js";
 
@@ -33,10 +33,10 @@ export const RenderModule = {
                 if (hasSize(data)) {
                     ({x: w, y: h} = data.components.size);
                 } else {
-                    ({width: w, height: h} = sprite);
+                    ({x: w, y: h} = sprite.source.size);
                 }
-                const rect = RectModule.Origin.toTl({origin: data.components.origin, size: {x: w, y: h}});
-                renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y, true);
+                const rect = GeometryModule.OriginRect.toTl({origin: data.components.origin.origin, size: {x: w, y: h}});
+                renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y, data.components.origin.inWorld);
             });
     },
 

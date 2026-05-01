@@ -1,8 +1,11 @@
 import type { PhysicsSystem } from "../../core/PhysicsSystem.js";
+import type { TouchType } from "../../data/inputs.js";
 import type { Game } from "../../game.js";
-import { RectModule, type OriginRect } from "../../util/Geometry.js";
+import { GeometryModule, type OriginRect } from "../../util/Geometry.js";
 import { IdMap } from "../../util/IdMap.js";
+import { createFactory } from "../../util/Typing.js";
 import { entityHas, type Entity, type With } from "../entity/Entity.js";
+import { UNASSIGNED } from "../entity/Uuid.js";
 import { hasVelocity, type OriginEntity } from "./Physical.js";
 
 /*
@@ -67,6 +70,7 @@ export enum Normal {
 };
 
 export type CollisionFn = (collision: CollisionEvent) => void;
+export type TouchFn = (touch: TouchEvent) => void;
 
 // Largely immutable, constructed per event
 export type CollisionEvent = {
@@ -80,6 +84,11 @@ export type CollisionEvent = {
     time: number,
 };
 
+export type TouchEvent = {
+    self: CollisionSet,
+    event: TouchType,
+};
+
 // Largely immutable, lives with entity
 export type CollisionSet = {
     uuid: number,
@@ -89,7 +98,16 @@ export type CollisionSet = {
     mask: Set<number>,
     rects: OriginRect[],
     onCollide?: CollisionFn | undefined,
+    touchMask?: Set<TouchType>,
+    onTouch?: TouchFn | undefined,
 };
+export const createCollisionSet = createFactory<CollisionSet, "uuid" | "entityId" | "isSolid" | "layers" | "mask">({
+    uuid: UNASSIGNED,
+    entityId: UNASSIGNED,
+    isSolid: false,
+    layers: new Set(),
+    mask: new Set(),
+});
 
 export type CollisionComponent = {
     collisionSets: CollisionSet[],
@@ -152,16 +170,19 @@ export const CollisionModule = {
         let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
         for (const collisionSet of data.components.collision.collisionSets) {
             for (const rect of collisionSet.rects) {
-                const topLeft = RectModule.Origin.topLeft(rect);
-                const bottomRight = RectModule.Origin.bottomRight(rect);
+                const topLeft = GeometryModule.OriginRect.topLeft(rect);
+                const bottomRight = GeometryModule.OriginRect.bottomRight(rect);
                 minX = Math.min(minX, topLeft.x);
                 minY = Math.min(minY, topLeft.y);
                 maxX = Math.max(maxX, bottomRight.x);
                 maxY = Math.max(maxY, bottomRight.y);
             }
         }
-        const origin = data.components.origin;
-        return RectModule.TopLeft.toOrigin({topLeft: {x: minX + origin.x, y: minY + origin.y}, size: {x: maxX - minX, y: maxY - minY}});
+        let {origin: {x, y}, inWorld: relative} = data.components.origin;
+        if (!relative) {
+            ({x, y} = data.game.renderSystem.screenToWorld({x, y}));
+        }
+        return GeometryModule.TlRect.toOrigin({topLeft: {x: minX + x, y: minY + y}, size: {x: maxX - minX, y: maxY - minY}});
     },
 
     updateCollisions: (physicsSystem: PhysicsSystem, data: CollisionEntity & OriginEntity) => {
@@ -170,8 +191,8 @@ export const CollisionModule = {
             return;
         }
         const box = CollisionModule.calculateBoundingBox(data);
-        const topLeft = RectModule.Origin.topLeft(box);
-        const bottomRight = RectModule.Origin.bottomRight(box);
+        const topLeft = GeometryModule.OriginRect.topLeft(box);
+        const bottomRight = GeometryModule.OriginRect.bottomRight(box);
         let [minX, minY] = [topLeft.x, topLeft.y];
         let [maxX, maxY] = [bottomRight.x, bottomRight.y];
         if (hasVelocity(data)) {

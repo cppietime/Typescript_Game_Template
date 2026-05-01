@@ -1,8 +1,7 @@
+import type { TlRect } from "../util/Geometry.js";
+
 export type Sprite = {
     image: string;
-    x0: number;
-    y0: number;
-    width: number;
-    height: number;
+    source: TlRect;
     color: string;
 };

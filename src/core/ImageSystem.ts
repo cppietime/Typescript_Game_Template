@@ -1,8 +1,8 @@
 import { ImageSpecs } from "../data/images.js";
 
 export class ImageSystem {
-    images: Map<string, HTMLImageElement>;
-    doneLoading = false;
+    private readonly images: Map<string, HTMLImageElement>;
+    private doneLoading = false;
 
     constructor() {
         this.images = new Map();
@@ -23,6 +23,8 @@ export class ImageSystem {
             img.onerror = err;
         });
     }
+
+    getImage = (name: string): HTMLImageElement | undefined => this.images.get(name);
 
     async loadImages() {
         await Promise.all(ImageSpecs.map((spec) => {

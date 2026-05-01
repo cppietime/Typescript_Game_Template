@@ -1,10 +1,10 @@
 import type { RenderSystem } from "../../core/RenderSystem.js";
-import { State } from "../../data/inputs.js";
+import { State, TouchType } from "../../data/inputs.js";
 import type { Sprite } from "../../data/sprites.js";
 import type { Game } from "../../game.js";
-import { RectModule } from "../../util/Geometry.js";
-import { CollisionModule, type CollisionEntity, type CollisionEvent, type CollisionSet } from "../physics/Collision.js";
-import type { OriginEntity, SizeEntity, VelocityEntity } from "../physics/Physical.js";
+import { createOriginRect, createTlRect, createVec2, GeometryModule } from "../../util/Geometry.js";
+import { CollisionModule, createCollisionSet, type CollisionEntity, type CollisionEvent, type CollisionSet } from "../physics/Collision.js";
+import { createOriginComponent, type SizeEntity, type VelocityEntity } from "../physics/Physical.js";
 import type { TickComponent, TickEntity } from "../physics/Tick.js";
 import { RenderModule, type RenderEntity } from "../render/RenderComponent.js";
 import type { Entity } from "./Entity.js";
@@ -20,10 +20,10 @@ export type PlayerEntity = RenderEntity & TickEntity & VelocityEntity & Collisio
 
 const sprite: Sprite = {
     image: 'sprite_atlas',
-    x0: 0,
-    y0: 0,
-    width: 16,
-    height: 16,
+    source: createTlRect({
+        topLeft: createVec2({}),
+        size: createVec2({x: 16, y: 16})
+    }),
     color: '#fff',
 };
 
@@ -38,14 +38,14 @@ export const PlayerModule = {
             components: {
                 renderable:
                     RenderModule.fromCallback(PlayerModule.render, 5),
-                origin: {x: 32, y: 32},
-                size: {x: 64, y: 64},
+                origin: createOriginComponent({origin: createVec2({x: 32, y: 32})}),
+                size: createVec2({x: 64, y: 64}),
                 tick: PlayerModule.update as TickComponent,
                 extra: {
                     pulse: 1,
                     startingTime: game.lastTime
                 } satisfies PlayerComponent,
-                velocity: {x: 0, y: 0},
+                velocity: createVec2({x: 0, y: 0}),
                 collision: {
                     collisionSets: collisionSets
                 }
@@ -54,19 +54,23 @@ export const PlayerModule = {
             uuid: UNASSIGNED,
             isAlive: true,
         };
-        collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: player.uuid,
-            isSolid: true,
-            layers: new Set([1]),
-            mask: new Set([0]),
-            rects: [{
-                origin: {x: 0, y: 0}, size: {x: 64, y: 64}
-            }],
-            onCollide: (collision: CollisionEvent) => {
-                console.log('Trigger')
-                player.components.renderable.visible = true;
-            },
-        }));
+        // Test logic for player collisions. Not for prod
+        collisionSets.push(CollisionModule.collisionSetMap.addAndTag(
+            createCollisionSet({
+                isSolid: true,
+                layers: new Set([1]),
+                mask: new Set([0]),
+                rects: [
+                    createOriginRect({size: createVec2({x: 64, y: 64})}),
+                ],
+                onCollide: (collision: CollisionEvent) => {
+                    console.log('Trigger')
+                    player.components.renderable.visible = true;
+                },
+                touchMask: new Set([TouchType.TOUCHING]),
+                onTouch: (touch) => console.log('Clicked!'),
+            }
+        )));
         return player;
     },
 
@@ -75,13 +79,13 @@ export const PlayerModule = {
     },
 
     render: (renderSystem: RenderSystem, data: PlayerEntity) => {
-        const {origin, size} = data.components;
+        const {origin: {origin}, size} = data.components;
         const extra = data.components.extra as PlayerComponent;
         const w = extra.pulse * size.x;
         const h = extra.pulse * size.y;
         const x = origin.x - w / 2;
         const y = origin.y - h / 2;
-        renderSystem.drawOutline(RectModule.Origin.toTl({origin: origin, size: size}), '#fff', true);
+        renderSystem.drawOutline(GeometryModule.OriginRect.toTl({origin: origin, size: size}), '#fff', true);
         renderSystem.drawSprite(sprite, x, y, w, h, true);
     },
 
@@ -103,6 +107,6 @@ export const PlayerModule = {
         extra.startingTime += game.deltaTime;
         extra.pulse = 0.333 * (Math.sin(extra.startingTime) + 3);
 
-        game.renderSystem.offset = data.components.origin;
+        game.renderSystem.offset = data.components.origin.origin;
     },
 };

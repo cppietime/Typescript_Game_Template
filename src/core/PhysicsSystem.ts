@@ -1,25 +1,26 @@
-import { entityHas, type Entity } from "../component/entity/Entity.js";
+import { type Entity } from "../component/entity/Entity.js";
 import { UNASSIGNED, UuidPool } from "../component/entity/Uuid.js";
-import { CollisionModule, hasCollision, Normal, type CollisionEntity, type CollisionEvent } from "../component/physics/Collision.js";
-import { hasOrigin, hasVelocity, type OriginEntity } from "../component/physics/Physical.js";
+import { CollisionModule, hasCollision, Normal, type CollisionEntity, type CollisionEvent, type TouchEvent } from "../component/physics/Collision.js";
+import { hasVelocity } from "../component/physics/Physical.js";
+import type { TouchType } from "../data/inputs.js";
 import type { Game } from "../game.js";
-import { insertionSort } from "../util/Algorithm.js";
+import { binarySearch, insertionSort } from "../util/Algorithm.js";
 import { CustomSet } from "../util/CustomSet.js";
-import { RectModule, sweptAABB, type CornerRect, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";
+import { createCornerRect, createVec2, GeometryModule, sweptAABB, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";
 import { MinHeap } from "../util/MinHeap.js";
-import type { ContainsEntityFn, EntitySystem, EntitySystemPredicate } from "./EntitySystem.js";
+import type { EntitySystem } from "./EntitySystem.js";
 
-type SapEdge = {
+export type SapEdge = {
     pos: number,
     isBeginning: boolean,
     uuid: number,
 };
 
-function sapEdgeCmp(left: SapEdge, right: SapEdge): number {
+export function sapEdgeCmp(left: SapEdge, right: SapEdge): number {
     return left.pos - right.pos;
 }
 
-type SapHandle = {
+export type SapHandle = {
     left: SapEdge,
     right: SapEdge,
     top: SapEdge,
@@ -49,11 +50,11 @@ function resetCollisionState(state: CollisionState) {
 export class PhysicsSystem implements EntitySystem {
     // These two lists store the edges of the bounding box of possible collisions.
     // I.e. if the object is moving, it should encompass everything between current and proposed position.
-    readonly edgesX: SapEdge[] = [];
-    readonly edgesY: SapEdge[] = [];
-    readonly sapHandles = new Map<number, SapHandle>();
-    readonly colliderIds: Set<number> = new Set();
-    readonly collisionState: CollisionState = {
+    private readonly edgesX: SapEdge[] = [];
+    private readonly edgesY: SapEdge[] = [];
+    private readonly sapHandles = new Map<number, SapHandle>();
+    private readonly colliderIds: Set<number> = new Set();
+    private readonly collisionState: CollisionState = {
         candidatePairs: [],
         candidatesMap: new Map(),
         involvedEvents: new Map(),
@@ -136,6 +137,22 @@ export class PhysicsSystem implements EntitySystem {
         return candidates;
     }
 
+    static sweepOne(edges: SapEdge[], start: number, end: number): Set<number> {
+        const intersections = new Set<number>();
+        edges.forEach((edge, idx) => {
+            if (edge.isBeginning) {
+                if (edge.pos <= end) {
+                    intersections.add(edge.uuid);
+                }
+            } else {
+                if (edge.pos < start) {
+                    intersections.delete(edge.uuid);
+                }
+            }
+        });
+        return intersections;
+    }
+
     static writeCandidatesMap(pair: [number, number], map: Map<number, number[]>) {
         const [a, b] = pair;
         if (!map.has(a)) {
@@ -150,17 +167,20 @@ export class PhysicsSystem implements EntitySystem {
 
     static colliderTimeVel(ent: CollisionEntity, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
         const time = localTime.get(ent.uuid)!;
-        const velocity = hasVelocity(ent) ? ent.components.velocity : {x: 0, y: 0};
-        return {time: time, velocity: {x: velocity.x * deltaTime, y: velocity.y * deltaTime}};
+        const velocity = hasVelocity(ent) ? ent.components.velocity : createVec2({});
+        return {time: time, velocity: createVec2({x: velocity.x * deltaTime, y: velocity.y * deltaTime})};
     }
 
     static colliderStartingPos(ent: CollisionEntity, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
-        const currentPos = ent.components.origin;
+        let {origin: {x, y}, inWorld: relative} = ent.components.origin;
+        if (!relative) {
+            ({x, y} = ent.game.renderSystem.screenToWorld({x, y}));
+        }
         const t = startTime - localTime.get(ent.uuid)!;
-        return {
-            x: currentPos.x + t * velocity.x,
-            y: currentPos.y + t * velocity.y,
-        };
+        return createVec2({
+            x: x + t * velocity.x,
+            y: y + t * velocity.y,
+        });
     }
 
     static collisionsFromPair(pair: [number, number], localTime: Map<number, number>, deltaTime: number): CollisionEvent[] {
@@ -188,11 +208,11 @@ export class PhysicsSystem implements EntitySystem {
                     continue bSetLoop;
                 }
                 for (const rectA of setA.rects) {
-                    const {topLeft: tlA, bottomRight: brA} = RectModule.Origin.toCorner(rectA);
+                    const {topLeft: tlA, bottomRight: brA} = GeometryModule.OriginRect.toCorner(rectA);
                     bRectLoop: for (const rectB of setB.rects) {
-                        const {topLeft: tlB, bottomRight: brB} = RectModule.Origin.toCorner(rectB);
-                        const topLeft = {x: tlB.x + bPos.x - brA.x - aPos.x, y: tlB.y + bPos.y - brA.y - aPos.y};
-                        const bottomRight = {x: brB.x + bPos.x - tlA.x - aPos.x, y: brB.y + bPos.y - tlA.y - aPos.y};
+                        const {topLeft: tlB, bottomRight: brB} = GeometryModule.OriginRect.toCorner(rectB);
+                        const topLeft = createVec2({x: tlB.x + bPos.x - brA.x - aPos.x, y: tlB.y + bPos.y - brA.y - aPos.y});
+                        const bottomRight = createVec2({x: brB.x + bPos.x - tlA.x - aPos.x, y: brB.y + bPos.y - tlA.y - aPos.y});
                         const sweep = sweptAABB({topLeft: topLeft, bottomRight: bottomRight}, relVel, initialTime);
                         if (sweep === undefined) {
                             continue bRectLoop;
@@ -226,8 +246,8 @@ export class PhysicsSystem implements EntitySystem {
         if (hasVelocity(entity)) {
             const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime;
             const vel = entity.components.velocity;
-            entity.components.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
-            entity.components.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
+            entity.components.origin.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
+            entity.components.origin.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
             switch (collision.normal) {
                 case Normal.LEFT:
                     vel.x = Math.min(vel.x, 0);
@@ -243,6 +263,15 @@ export class PhysicsSystem implements EntitySystem {
                     break;
             }
         }
+    }
+
+    static recalculatePositions(uuid: number, candidateMap: Map<number, number[]>, localTime: Map<number, number>, deltaTime: number) {
+        const partners = candidateMap.get(uuid) ?? [];
+        const accum: CollisionEvent[] = [];
+        partners.forEach(partner => {
+            accum.push(...PhysicsSystem.collisionsFromPair([uuid, partner], localTime, deltaTime));
+        });
+        return accum;
     }
 
     checkCollisions(game: Game) {
@@ -314,10 +343,20 @@ export class PhysicsSystem implements EntitySystem {
                 triggerEvents.length = 0;
 
                 // Recalculate collisions involving either entity and add back to priority queue
-                const pair: [number, number] = [nextCollision.self.entityId, nextCollision.trigger.entityId];
-                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
+                //const pair: [number, number] = [nextCollision.self.entityId, nextCollision.trigger.entityId];
+                //const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
+                const collisions: CollisionEvent[] = [
+                    ...PhysicsSystem.recalculatePositions(nextCollision.self.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime),
+                    ...PhysicsSystem.recalculatePositions(nextCollision.trigger.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime)
+                ];
                 for (const collision of collisions) {
                     this.collisionState.priorityQueue.insert(collision);
+                    [collision.self.entityId, collision.trigger.entityId].forEach((id) => {
+                        if (!this.collisionState.involvedEvents.has(id)) {
+                            this.collisionState.involvedEvents.set(id, []);
+                        }
+                        this.collisionState.involvedEvents.get(id)!.push(collision);
+                    });
                     selfEvents.push(collision);
                     triggerEvents.push(collision);
                 }
@@ -335,7 +374,6 @@ export class PhysicsSystem implements EntitySystem {
         // Fire all registered collision events
         for (const collision of this.collisionState.eventQueue) {
             if (collision.layers.size > 0) collision.self.onCollide?.(collision);
-            //if (collision.invLayers.size > 0) collision.trigger.onCollide?.(CollisionModule.invert(collision));
         }
 
         // Resolve remaining velocities
@@ -351,8 +389,60 @@ export class PhysicsSystem implements EntitySystem {
             const origin = entity.components.origin;
             const velocity = entity.components.velocity;
             const ellapsed = (1 - localTime) * deltaTime;
-            origin.x += velocity.x * ellapsed;
-            origin.y += velocity.y * ellapsed;
+            origin.origin.x += velocity.x * ellapsed;
+            origin.origin.y += velocity.y * ellapsed;
+        }
+    }
+
+    // Putting this here because it reuses collision logic
+    fireInputEvents(game: Game, eventType: TouchType, position: OriginRect) {
+        position.origin = game.renderSystem.screenToWorld(position.origin);
+
+        this.edgesX.sort(sapEdgeCmp);
+        this.edgesY.sort(sapEdgeCmp);
+
+        const corners = GeometryModule.OriginRect.toCorner(position);
+
+        const xIds = PhysicsSystem.sweepOne(this.edgesX, corners.topLeft.x, corners.bottomRight.x);
+        const yIds = PhysicsSystem.sweepOne(this.edgesY, corners.topLeft.y, corners.bottomRight.y);
+
+        for (const id of xIds) {
+            if (!yIds.has(id)) {
+                continue;
+            }
+            const entity = UuidPool.get(id);
+            if (entity === undefined || !hasCollision(entity)) {
+                continue;
+            }
+            let basePos = entity.components.origin.origin;
+            if (!entity.components.origin.inWorld) {
+                basePos = game.renderSystem.screenToWorld(basePos);
+            }
+            setLoop: for (const set of entity.components.collision.collisionSets) {
+                if (!set.touchMask?.has(eventType) || set.onTouch === undefined) {
+                    continue setLoop;
+                }
+                rectLoop: for (const oRect of set.rects) {
+                    const topLeft = createVec2({
+                        x: oRect.origin.x - oRect.size.x / 2 + basePos.x,
+                        y: oRect.origin.y - oRect.size.y / 2 + basePos.y,
+                    });
+                    const bottomRight = createVec2({
+                        x: oRect.origin.x + oRect.size.x / 2 + basePos.x,
+                        y: oRect.origin.y + oRect.size.y / 2 + basePos.y,
+                    });
+                    const cRect = createCornerRect({topLeft, bottomRight});
+                    const overlap = GeometryModule.CornerRect.overlap(cRect, corners);
+                    if (overlap === undefined) {
+                        continue rectLoop;
+                    }
+                    const event: TouchEvent = {
+                        self: set,
+                        event: eventType,
+                    };
+                    set.onTouch(event);
+                }
+            }
         }
     }
 

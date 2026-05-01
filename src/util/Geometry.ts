@@ -1,27 +1,32 @@
 import { Normal } from "../component/physics/Collision.js";
+import { createFactory } from "./Typing.js";
 
 export type Vec2 = {
     x: number,
     y: number,
 };
+export const createVec2 = createFactory<Vec2, "x" | "y">({x: 0, y: 0});
 
 export type OriginRect = {
     origin: Vec2,
     size: Vec2,
 };
+export const createOriginRect = createFactory<OriginRect, "origin">({origin: createVec2({})});
 
 export type TlRect = {
     topLeft: Vec2,
     size: Vec2,
 };
+export const createTlRect = createFactory<TlRect, never>({});
 
 export type CornerRect = {
     topLeft: Vec2,
     bottomRight: Vec2,
 };
+export const createCornerRect = createFactory<CornerRect, never>({});
 
-export const RectModule = {
-    Origin: {
+export const GeometryModule = {
+    OriginRect: {
         toTl: (rect: OriginRect): TlRect => {
             return {
                 topLeft: {x: rect.origin.x - rect.size.x / 2, y: rect.origin.y - rect.size.y / 2},
@@ -39,9 +44,9 @@ export const RectModule = {
         },
         bottomRight: (rect: OriginRect): Vec2 => {
             return {x: rect.origin.x + rect.size.x / 2, y: rect.origin.y + rect.size.y / 2};
-        }
+        },
     },
-    TopLeft: {
+    TlRect: {
         toOrigin: (rect: TlRect): OriginRect =>{
             return {
                 origin: {x: rect.topLeft.x + rect.size.x / 2, y: rect.topLeft.y + rect.size.y / 2},
@@ -54,6 +59,21 @@ export const RectModule = {
                 bottomRight: {x: rect.topLeft.x + rect.size.x, y: rect.topLeft.y + rect.size.y},
             };
         },
+    },
+    CornerRect: {
+        overlap: (a: CornerRect, b: CornerRect): CornerRect | undefined => {
+            const minX = Math.max(a.topLeft.x, b.topLeft.x);
+            const maxX = Math.min(a.bottomRight.x, b.bottomRight.x);
+            const minY = Math.max(a.topLeft.y, b.topLeft.y);
+            const maxY = Math.min(a.bottomRight.y, b.bottomRight.y);
+            if (minX > maxX || minY > maxY) {
+                return undefined;
+            }
+            return createCornerRect({
+                topLeft: createVec2({x: minX, y: minY}),
+                bottomRight: createVec2({x: maxX, y: maxY}),
+            })
+        }
     },
     rectContains: (rect: OriginRect, pt: Vec2) => {
         return pt.x >= rect.origin.x - rect.size.x / 2 &&

@@ -5,7 +5,7 @@ import {hasTick, type TickEntity} from "../component/physics/Tick.js";
 import type { ContainsEntityFn, EntitySystem, EntitySystemPredicate } from "./EntitySystem.js";
 
 export class UpdateSystem implements EntitySystem {
-    updateUuids: Set<number> = new Set();
+    private readonly updateUuids: Set<number> = new Set();
 
     predicate(entity: Entity<any>): boolean {
         return hasTick(entity);

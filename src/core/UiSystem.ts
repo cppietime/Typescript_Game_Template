@@ -2,8 +2,8 @@ import type { Game } from "../game.js";
 import {Trigger} from '../data/inputs.js';
 
 export class UiSystem {
-    game: Game;
-    pauseMenu: HTMLElement | null = null;
+    private readonly game: Game;
+    private pauseMenu: HTMLElement | null = null;
 
     constructor(game: Game) {
         this.game = game;

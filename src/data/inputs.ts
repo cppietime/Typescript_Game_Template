@@ -9,3 +9,10 @@ export enum State {
     UP,
     DOWN,
 };
+
+export enum TouchType {
+    BEGIN,
+    MOVE,
+    END,
+    TOUCHING,
+};

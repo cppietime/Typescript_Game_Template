@@ -1,6 +1,8 @@
-import { State, Trigger } from "../data/inputs.js";
+import { State, TouchType, Trigger } from "../data/inputs.js";
 import type { Game } from "../game.js";
+import { createOriginRect, createVec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
+import type { SapEdge, SapHandle } from "./PhysicsSystem.js";
 
 export type InputRegion = {
     predicate: (click: ClickState, regionStates: Set<State>) => boolean
@@ -16,13 +18,16 @@ export type ClickState = {
 };
 
 export class InputSystem {
-    game: Game;
-
-    triggerMapping: Map<Trigger, (() => void)[]> = new Map();
-    activeStates: Set<State> = new Set();
-    currentClick: ClickState = {x: 0, y: 0, down: false, initial: false};
+    private readonly game: Game;
+    private readonly triggerMapping: Map<Trigger, (() => void)[]> = new Map();
+    private readonly activeStates: Set<State> = new Set();
+    private readonly currentClick: ClickState = {x: 0, y: 0, down: false, initial: false};
+    private readonly regionStates: Set<State> = new Set();
+    private readonly edgesX: SapEdge[] = [];
+    private readonly edgesY: SapEdge[] = [];
+    private readonly handles: SapHandle[] = [];
+    
     inputRegions: IdMap<InputRegion> = new IdMap();
-    regionStates: Set<State> = new Set();
     touchListeners: IdMap<TouchListener> = new IdMap();
 
     constructor(game: Game) {
@@ -57,6 +62,10 @@ export class InputSystem {
         } else {
             this.activeStates.delete(state);
         }
+    }
+
+    queueRegion(state: State) {
+        this.regionStates.add(state);
     }
 
     setupInputs() {
@@ -116,17 +125,38 @@ export class InputSystem {
                 for (const listener of this.touchListeners.values()) {
                     listener(this.currentClick);
                 }
+                this.game.physicsSystem.fireInputEvents(this.game, TouchType.BEGIN, createOriginRect({
+                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
+                    size: createVec2({}),
+                }));
             });
             this.game.canvas.addEventListener('mouseup', (ev: MouseEvent) => {
                 this.currentClick.down = false;
                 this.currentClick.initial = false;
                 this.updateRegionStates();
+                this.game.physicsSystem.fireInputEvents(this.game, TouchType.END, createOriginRect({
+                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
+                    size: createVec2({}),
+                }));
             });
             this.game.canvas.addEventListener('mousemove', (ev: MouseEvent) => {
                 this.setClickPos(ev.offsetX, ev.offsetY);
                 this.currentClick.initial = false;
                 this.updateRegionStates();
+                this.game.physicsSystem.fireInputEvents(this.game, TouchType.MOVE, createOriginRect({
+                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
+                    size: createVec2({}),
+                }));
             });
+    }
+
+    fireTouchEvent() {
+        if (this.currentClick.down) {
+            this.game.physicsSystem.fireInputEvents(this.game, TouchType.TOUCHING, createOriginRect({
+                origin: createVec2({...this.currentClick}),
+                size: createVec2({}),
+            }));
+        }
     }
 
     setClickPos(screenX: number, screenY: number) {
@@ -156,6 +186,10 @@ export class InputSystem {
 
     isPressed(state: State): boolean {
         return this.activeStates.has(state) || this.regionStates.has(state);
+    }
+
+    clearRegions() {
+        this.regionStates.clear();
     }
 
 

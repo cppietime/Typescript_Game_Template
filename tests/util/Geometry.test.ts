@@ -1,5 +1,20 @@
 import { Normal } from "../../src/component/physics/Collision.js";
-import { sweptAABB, type CornerRect, type SweepResult, type Vec2 } from "../../src/util/Geometry.js";
+import { createVec2, sweptAABB, type CornerRect, type SweepResult, type Vec2 } from "../../src/util/Geometry.js";
+
+describe('Default factories', () => {
+    test('Create default vec2', () => {
+        const vec = createVec2({});
+        expect(vec).toEqual({x: 0, y: 0});
+    });
+    test('Create half-default vec2', () => {
+        const vec = createVec2({x: 4});
+        expect(vec).toEqual({x: 4, y: 0});
+    });
+    test('Create nondefault vec2', () => {
+        const vec = createVec2({x: 1, y: 3});
+        expect(vec).toEqual({x: 1, y: 3});
+    });
+});
 
 describe('Collisions', () => {
     test('Sweep horizontal left', () => {

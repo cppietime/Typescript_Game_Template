@@ -1,23 +1,21 @@
 import { JoystickModule } from './component/controls/Joystick.js';
 import { DecorModule } from './component/entity/Decor.js';
 import { PlayerModule, type PlayerEntity } from './component/entity/Player.js';
-import { CollisionModule } from './component/physics/Collision.js';
-import { RenderModule } from './component/render/RenderComponent.js';
+import { CollisionModule, createCollisionSet } from './component/physics/Collision.js';
 import { InputSystem } from './core/InputSystem.js';
-import type { ClickState } from './core/InputSystem.js';
 import { PhysicsSystem } from './core/PhysicsSystem.js';
-import { RenderGroup, RenderSystem } from './core/RenderSystem.js';
+import { RenderSystem } from './core/RenderSystem.js';
 import { UiSystem } from './core/UiSystem.js';
 import { UpdateSystem } from './core/UpdateSystem.js';
 import * as constants from './data/constants.js';
-import {State, Trigger} from './data/inputs.js';
-import type { Sprite } from './data/sprites.js';
+import {Trigger} from './data/inputs.js';
 import type { Vec2, OriginRect } from './util/Geometry.js';
-import { RectModule } from './util/Geometry.js';
+import { createOriginRect, createTlRect, createVec2, GeometryModule } from './util/Geometry.js';
 import {ScrollModule} from './component/entity/Scroll.js';
 import type { EntitySystem } from "./core/EntitySystem.js";
-import type { Entity, PreEntity } from "./component/entity/Entity.js";
-import { UNASSIGNED, UuidPool } from "./component/entity/Uuid.js";
+import type { Entity } from "./component/entity/Entity.js";
+import { UuidPool } from "./component/entity/Uuid.js";
+import { createOriginComponent } from "./component/physics/Physical.js";
 
 enum CommandType {
     CREATE,
@@ -187,68 +185,48 @@ export class Game {
     }
 
     player?: PlayerEntity;
+    // Placaeholder function to set up a debugging world
     setupTestSprite() {
-        const sprite: Sprite = {
-            image: 'sprite_atlas',
-            x0: 0,
-            y0: 0,
-            width: 16,
-            height: 16,
-            color: '#ffffff'
-        };
-
         this.player = PlayerModule.create(this);
         this.createEntity(this.player);
 
         const joystick = JoystickModule.createDpad8(this);
         this.createEntity(joystick);
-        
-        //this.renderSystem.addEntity(this.player);
-        //this.renderSystem.addEntity(joystick);
 
         this.renderSystem.clearColor = '#008800';
 
-        const centerSquare: OriginRect = {
-            origin: {x: 50, y: 630},
-            size: {x: 30, y: 30},
-        };
+        const centerSquare: OriginRect = createOriginRect({
+            origin: createVec2({x: 50, y: 630}),
+            size: createVec2({x: 30, y: 30}),
+        });
         this.inputSystem.touchListeners.add(clickState => {
             if (!(clickState.down && clickState.initial))
                 return;
-            if (RectModule.rectContains(centerSquare, clickState)) {
+            if (GeometryModule.rectContains(centerSquare, clickState)) {
                 console.log('Center click');
             }
         });
 
-        //this.physicsSystem.addEntity(this.player);
-
         const prop = DecorModule.createDecor(this);
-        prop.components.origin = {x: 400.5, y: 144};
-        //this.physicsSystem.addEntity(prop);
-        //this.renderSystem.addEntity(prop);
-        prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
+        prop.components.origin = createOriginComponent({origin: createVec2({x: 400.5, y: 144})});
+        prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag(createCollisionSet({
             entityId: prop.uuid,
             isSolid: true,
             layers: new Set([1]),
             mask: new Set([1]),
             rects: [
-                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+                createOriginRect({size: createVec2({x: 64, y: 64})})
             ],
-            onCollide: () => console.log('Solid Collision')
-        }));
+            onCollide: () => {}
+        })));
         this.createEntity(prop);
 
-        const trigger = DecorModule.createDecor(this, false);
-        trigger.components.origin = {x: 220, y: 544};
-        //this.physicsSystem.addEntity(trigger);
-        //this.renderSystem.addEntity(trigger);
-        trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
-            entityId: trigger.uuid,
-            isSolid: false,
-            layers: new Set([]),
+        const trigger = DecorModule.createDecor(this);
+        trigger.components.origin = createOriginComponent({origin: createVec2({x: 220, y: 544})});
+        trigger.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag(createCollisionSet({
             mask: new Set([1]),
             rects: [
-                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+                createOriginRect({size: createVec2({x: 64, y: 64})})
             ],
             onCollide: () => {
                 console.log('Nonsolid Collision');
@@ -256,40 +234,30 @@ export class Game {
                 const r = this.player?.components.renderable;
                 if (r !== undefined) r.visible = false;
             }
-        }));
+        })));
         this.createEntity(trigger);
         console.log('Trigger id', trigger.uuid);
 
-        const triggered = DecorModule.createDecor(this, false);
-        triggered.components.origin = {x: 300, y: 300};
-        //this.physicsSystem.addEntity(triggered);
-        //this.renderSystem.addEntity(triggered);
-        triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag({
+        const triggered = DecorModule.createDecor(this);
+        triggered.components.origin = createOriginComponent({origin: createVec2({x: 300, y: 300}), inWorld: false});
+        triggered.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag(createCollisionSet({
             entityId: triggered.uuid,
-            isSolid: false,
             layers: new Set([0]),
-            mask: new Set([]),
             rects: [
-                {origin: {x: 0, y: 0}, size: {x: 64, y: 64}}
+                createOriginRect({size: createVec2({x: 64, y: 64})})
             ],
-        }));
+        })));
         this.createEntity(triggered);
 
         const bg = ScrollModule.create(this, {
             image: 'background',
-            x0: 0,
-            y0: 0,
-            width: 1280,
-            height: 720,
+            source: createTlRect({
+                topLeft: createVec2({}),
+                size: createVec2({x: 1280, y: 720})
+            }),
             color: '#ff0',
         });
         this.createEntity(bg);
-        //this.renderSystem.addEntity(bg);
-
-        //this.updateSystem.addEntity(this.player);
-        //this.updateSystem.addEntity(prop);
-        //this.updateSystem.addEntity(trigger);
-        //this.updateSystem.addEntity(triggered);
     }
 
     gameLoop() {
@@ -319,7 +287,7 @@ export class Game {
             return;
         }
 
-        // this.player?.components.update(this, this.player);
+        this.inputSystem.fireTouchEvent();
         this.updateSystem.update(this);
 
         this.physicsSystem.checkCollisions(this);
@@ -330,6 +298,6 @@ export class Game {
     }
 
     positionOnCanvas(x: number, y: number): Vec2 {
-        return this.renderSystem.positionOnCanvas(x, y);
+        return this.renderSystem.positionOnCanvas({x, y});
     }
 }

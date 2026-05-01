@@ -1,7 +1,4 @@
 import type { Game } from "../../game.js";
-import type { OriginRect, Vec2 } from "../../util/Geometry.js";
-import type { CollisionComponent } from "../physics/Collision.js";
-import type { RenderComponent } from "../render/RenderComponent.js";
 import type { CleanupFn } from "./Uuid.js";
 
 export type Entity<C extends Record<string, any>> = {
