@@ -1,6 +1,6 @@
 import { State, Trigger } from "../../game/data/Inputs.js";
 import {TouchType} from "../../engine/data/types/Inputs.js";
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import { createOriginRect, createVec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
 import type { SapEdge, SapHandle } from "./PhysicsSystem.js";

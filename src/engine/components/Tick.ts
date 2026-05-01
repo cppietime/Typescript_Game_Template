@@ -1,4 +1,4 @@
-import type {Game} from "../../Game.js";
+import type {Game} from "../Game.js";
 import { type Entity, entityHas } from "../entity/Entity.js";
 
 export type TickComponent = (game: Game, data: TickEntity) => void;

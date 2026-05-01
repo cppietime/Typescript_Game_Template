@@ -1,5 +1,5 @@
 import { State } from "../../data/Inputs.js";
-import type { Game } from "../../../Game.js";
+import type { Game } from "../../../engine/Game.js";
 import { type Entity } from "../../../engine/entity/Entity.js";
 import { UNASSIGNED, type CleanupFn } from "../../../engine/entity/Uuid.js";
 import { RenderModule, type RenderEntity } from "../../../engine/components/RenderComponent.js";

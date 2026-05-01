@@ -1,6 +1,6 @@
 import { entityHas, type Entity } from "../entity/Entity.js";
 import { UuidPool } from "../entity/Uuid.js";
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import {hasTick, type TickEntity} from "../components/Tick.js";
 import type { ContainsEntityFn, EntitySystem, EntitySystemPredicate } from "./EntitySystem.js";
 

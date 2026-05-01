@@ -3,7 +3,7 @@ import { UNASSIGNED, UuidPool } from "../entity/Uuid.js";
 import { CollisionModule, compareTouchEvent, createTouchEvent, hasCollision, Normal, type CollisionEntity, type CollisionEvent, type TouchEvent } from "../components/Collision.js";
 import { hasVelocity } from "../components/Physical.js";
 import {TouchType} from "../../engine/data/types/Inputs.js";
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import { binarySearch, insertionSort } from "../util/Algorithm.js";
 import { CustomSet } from "../util/CustomSet.js";
 import { createCornerRect, createVec2, GeometryModule, sweptAABB, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";

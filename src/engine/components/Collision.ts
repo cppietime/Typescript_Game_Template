@@ -1,6 +1,6 @@
 import type { PhysicsSystem } from "../systems/PhysicsSystem.js";
 import {TouchType} from "../../engine/data/types/Inputs.js";
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import { GeometryModule, type OriginRect } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
 import { createFactory } from "../util/Typing.js";

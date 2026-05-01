@@ -45,6 +45,6 @@
 
     "forceConsistentCasingInFileNames": true,
   },
-  "include": ["src/*"],
+  "include": ["src/*", "src/engine/Game.ts", "src/game/Bootstrap.ts"],
   "exclude": ["test/*"],
 }

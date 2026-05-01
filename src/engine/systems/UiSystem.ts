@@ -1,4 +1,4 @@
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import {Trigger} from '../../game/data/Inputs.js';
 
 export class UiSystem {

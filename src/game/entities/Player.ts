@@ -1,7 +1,7 @@
 import type { RenderSystem } from "../../engine/systems/RenderSystem.js";
 import { State } from "../data/Inputs.js";
 import type { Sprite } from "../../engine/data/types/Sprites.js";
-import type { Game } from "../../Game.js";
+import type { Game } from "../../engine/Game.js";
 import { createOriginRect, createTlRect, createVec2, GeometryModule } from "../../engine/util/Geometry.js";
 import { CollisionModule, createCollisionSet, type CollisionEntity, type CollisionEvent, type CollisionSet } from "../../engine/components/Collision.js";
 import { createOriginComponent, type SizeEntity, type VelocityEntity } from "../../engine/components/Physical.js";

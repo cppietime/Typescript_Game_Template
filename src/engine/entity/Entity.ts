@@ -1,4 +1,4 @@
-import type { Game } from "../../Game.js";
+import type { Game } from "../Game.js";
 import type { CleanupFn } from "../entity/Uuid.js";
 
 export type Entity<C extends Record<string, any>> = {

@@ -1,6 +1,6 @@
 import { RenderSystem } from '../../../engine/systems/RenderSystem.js';
 import { type Sprite } from '../../../engine/data/types/Sprites.js';
-import { Game } from '../../../Game.js';
+import { Game } from '../../../engine/Game.js';
 import { modulo } from '../../../engine/util/Algorithm.js';
 import { createVec2, type Vec2 } from '../../../engine/util/Geometry.js';
 import { createOriginComponent, hasSize, type OriginEntity, type SizeEntity } from '../../../engine/components/Physical.js';
