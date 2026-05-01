@@ -1,21 +1,21 @@
-import { JoystickModule } from './component/controls/Joystick.js';
-import { DecorModule } from './component/entity/Decor.js';
-import { PlayerModule, type PlayerEntity } from './component/entity/Player.js';
-import { CollisionModule, createCollisionSet } from './component/physics/Collision.js';
-import { InputSystem } from './core/InputSystem.js';
-import { PhysicsSystem } from './core/PhysicsSystem.js';
-import { RenderSystem } from './core/RenderSystem.js';
-import { UiSystem } from './core/UiSystem.js';
-import { UpdateSystem } from './core/UpdateSystem.js';
-import * as constants from './data/constants.js';
-import {Trigger} from './data/inputs.js';
-import type { Vec2, OriginRect } from './util/Geometry.js';
-import { createOriginRect, createTlRect, createVec2, GeometryModule } from './util/Geometry.js';
-import {ScrollModule} from './component/entity/Scroll.js';
-import type { EntitySystem } from "./core/EntitySystem.js";
-import type { Entity } from "./component/entity/Entity.js";
-import { UuidPool } from "./component/entity/Uuid.js";
-import { createOriginComponent } from "./component/physics/Physical.js";
+import { JoystickModule } from './game/entities/ui/Joystick.js';
+import { DecorModule } from './game/entities/template/Decor.js';
+import { PlayerModule, type PlayerEntity } from './game/entities/Player.js';
+import { CollisionModule, createCollisionSet } from './engine/components/Collision.js';
+import { InputSystem } from './engine/systems/InputSystem.js';
+import { PhysicsSystem } from './engine/systems/PhysicsSystem.js';
+import { RenderSystem } from './engine/systems/RenderSystem.js';
+import { UiSystem } from './engine/systems/UiSystem.js';
+import { UpdateSystem } from './engine/systems/UpdateSystem.js';
+import * as constants from './game/data/Constants.js';
+import {Trigger} from './game/data/Inputs.js';
+import type { Vec2, OriginRect } from './engine/util/Geometry.js';
+import { createOriginRect, createTlRect, createVec2, GeometryModule } from './engine/util/Geometry.js';
+import {ScrollModule} from './game/entities/template/Scroll.js';
+import type { EntitySystem } from "./engine/systems/EntitySystem.js";
+import type { Entity } from "./engine/entity/Entity.js";
+import { UuidPool } from "./engine/entity/Uuid.js";
+import { createOriginComponent } from "./engine/components/Physical.js";
 
 enum CommandType {
     CREATE,

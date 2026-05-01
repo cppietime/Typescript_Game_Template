@@ -1,0 +1,469 @@
+import { type Entity } from "../entity/Entity.js";
+import { UNASSIGNED, UuidPool } from "../entity/Uuid.js";
+import { CollisionModule, compareTouchEvent, createTouchEvent, hasCollision, Normal, type CollisionEntity, type CollisionEvent, type TouchEvent } from "../components/Collision.js";
+import { hasVelocity } from "../components/Physical.js";
+import {TouchType} from "../../engine/data/types/Inputs.js";
+import type { Game } from "../../Game.js";
+import { binarySearch, insertionSort } from "../util/Algorithm.js";
+import { CustomSet } from "../util/CustomSet.js";
+import { createCornerRect, createVec2, GeometryModule, sweptAABB, type OriginRect, type SweepResult, type Vec2 } from "../util/Geometry.js";
+import { MinHeap } from "../util/MinHeap.js";
+import type { EntitySystem } from "./EntitySystem.js";
+
+export type SapEdge = {
+    pos: number,
+    isBeginning: boolean,
+    uuid: number,
+};
+
+export function sapEdgeCmp(left: SapEdge, right: SapEdge): number {
+    return left.pos - right.pos;
+}
+
+export type SapHandle = {
+    left: SapEdge,
+    right: SapEdge,
+    top: SapEdge,
+    bottom: SapEdge,
+};
+
+type CollisionState = {
+    candidatePairs: [number, number][],
+    candidatesMap: Map<number, number[]>,
+    involvedEvents: Map<number, CollisionEvent[]>,
+    localTime: Map<number, number>,
+    priorityQueue: MinHeap<CollisionEvent>,
+    eventQueue: CollisionEvent[],
+    firedTriggers: CustomSet<[number, number]>,
+};
+
+function resetCollisionState(state: CollisionState) {
+    state.candidatePairs.length = 0;
+    state.candidatesMap.clear();
+    state.involvedEvents.clear();
+    state.localTime.clear();
+    state.priorityQueue.clear();
+    state.eventQueue.length = 0;
+    state.firedTriggers.clear();
+}
+
+type TouchState = {
+    queue: MinHeap<TouchEvent>,
+};
+
+function resetTouchState(state: TouchState) {
+    state.queue.clear();
+}
+
+export class PhysicsSystem implements EntitySystem {
+    // These two lists store the edges of the bounding box of possible collisions.
+    // I.e. if the object is moving, it should encompass everything between current and proposed position.
+    private readonly edgesX: SapEdge[] = [];
+    private readonly edgesY: SapEdge[] = [];
+    private readonly sapHandles = new Map<number, SapHandle>();
+    private readonly colliderIds: Set<number> = new Set();
+    private readonly collisionState: CollisionState = {
+        candidatePairs: [],
+        candidatesMap: new Map(),
+        involvedEvents: new Map(),
+        localTime: new Map(),
+        priorityQueue: new MinHeap((a, b) => a.time - b.time),
+        eventQueue: [],
+        firedTriggers: CustomSet.pairSet(),
+    };
+    private readonly touchState: TouchState = {
+        queue: new MinHeap<TouchEvent>(compareTouchEvent),
+    };
+
+    predicate(entity: Entity<any>): boolean {
+        return hasCollision(entity);
+    }
+
+    addEntity(entity: Entity<any>) {
+        if (!hasCollision(entity)) {
+            return;
+        }
+        entity.components.collision.collisionSets.forEach(set => set.entityId = entity.uuid);
+        this.addCollider(entity.uuid);
+    }
+
+    removeEntity(uuid: number) {
+        this.removeCollider(uuid);
+    }
+
+    containsEntity(uuid: number): boolean {
+        return this.colliderIds.has(uuid);
+    }
+
+    addCollider(uuid: number) {
+        const left: SapEdge = {pos: 0, isBeginning: true, uuid: uuid};
+        const right: SapEdge = {pos: 0, isBeginning: false, uuid: uuid};
+        const top: SapEdge = {pos: 0, isBeginning: true, uuid: uuid};
+        const bottom: SapEdge = {pos: 0, isBeginning: false, uuid: uuid};
+        this.edgesX.push(left, right);
+        this.edgesY.push(top, bottom);
+        this.sapHandles.set(uuid, {left: left, right: right, top: top, bottom: bottom});
+        this.colliderIds.add(uuid);
+    }
+
+    removeCollider(uuid: number) {
+        const handle = this.sapHandles.get(uuid);
+        if (handle === undefined) {
+            return;
+        }
+        handle.left.uuid = UNASSIGNED;
+        handle.right.uuid = UNASSIGNED;
+        handle.top.uuid = UNASSIGNED;
+        handle.bottom.uuid = UNASSIGNED;
+        handle.left.pos = Infinity;
+        handle.right.pos = Infinity;
+        handle.top.pos = Infinity;
+        handle.bottom.pos = Infinity;
+        this.sapHandles.delete(uuid);
+        this.colliderIds.delete(uuid);
+    }
+
+    getHandle(uuid: number) {
+        return this.sapHandles.get(uuid);
+    }
+
+    static sweepAndPrune(edges: SapEdge[]) {
+        const activeSets: Set<number> = new Set();
+        const candidates: CustomSet<[number, number]> = CustomSet.pairSet();
+        for (let i = 0; i < edges.length; i++) {
+            const {uuid, isBeginning} = edges[i]!;
+            if (uuid === UNASSIGNED) {
+                edges.length = i;
+                break;
+            }
+            if (isBeginning) {
+                activeSets.add(uuid);
+            } else {
+                activeSets.delete(uuid);
+                activeSets.forEach((id) => {
+                    candidates.add([uuid, id]);
+                });
+            }
+        }
+        return candidates;
+    }
+
+    static sweepOne(edges: SapEdge[], start: number, end: number): Set<number> {
+        const intersections = new Set<number>();
+        edges.forEach((edge) => {
+            if (edge.isBeginning) {
+                if (edge.pos <= end) {
+                    intersections.add(edge.uuid);
+                }
+            } else {
+                if (edge.pos < start) {
+                    intersections.delete(edge.uuid);
+                }
+            }
+        });
+        return intersections;
+    }
+
+    static writeCandidatesMap(pair: [number, number], map: Map<number, number[]>) {
+        const [a, b] = pair;
+        if (!map.has(a)) {
+            map.set(a, []);
+        }
+        if (!map.has(b)) {
+            map.set(b, []);
+        }
+        map.get(a)!.push(b);
+        map.get(b)!.push(a);
+    }
+
+    static colliderTimeVel(ent: CollisionEntity, localTime: Map<number, number>, deltaTime: number): {time: number, velocity: Vec2} {
+        const time = localTime.get(ent.uuid)!;
+        const velocity = hasVelocity(ent) ? ent.components.velocity : createVec2({});
+        return {time: time, velocity: createVec2({x: velocity.x * deltaTime, y: velocity.y * deltaTime})};
+    }
+
+    static colliderStartingPos(ent: CollisionEntity, velocity: Vec2, startTime: number, localTime: Map<number, number>): Vec2 {
+        let {origin: {x, y}, inWorld: relative} = ent.components.origin;
+        if (!relative) {
+            ({x, y} = ent.game.renderSystem.screenToWorld({x, y}));
+        }
+        const t = startTime - localTime.get(ent.uuid)!;
+        return createVec2({
+            x: x + t * velocity.x,
+            y: y + t * velocity.y,
+        });
+    }
+
+    static collisionsFromPair(pair: [number, number], localTime: Map<number, number>, deltaTime: number): CollisionEvent[] {
+        const entities = pair.map(id => UuidPool.get(id));
+        const noneMissing = (es: (Entity<{}> | undefined)[]): es is [CollisionEntity, CollisionEntity] =>
+            !es.some(e => e == undefined || !hasCollision(e));
+        if (!noneMissing(entities)) {
+            return [];
+        }
+        const [a, b] = entities;
+        const {time: aTime, velocity: aVel} = PhysicsSystem.colliderTimeVel(a, localTime, deltaTime);
+        const {time: bTime, velocity: bVel} = PhysicsSystem.colliderTimeVel(b, localTime, deltaTime);
+        const relVel: Vec2 = {x: aVel.x - bVel.x, y: aVel.y - bVel.y};
+        const initialTime = Math.max(aTime, bTime);
+        const aPos = PhysicsSystem.colliderStartingPos(a, aVel, initialTime, localTime);
+        const bPos = PhysicsSystem.colliderStartingPos(b, bVel, initialTime, localTime);
+
+        const collisions: CollisionEvent[] = [];
+        for (const setA of a.components.collision.collisionSets) {
+            bSetLoop: for (const setB of b.components.collision.collisionSets) {
+                let firstSweep: SweepResult | undefined;
+                const layers = CollisionModule.matchingLayers(setB.layers, setA.mask);
+                const invLayers = CollisionModule.matchingLayers(setA.layers, setB.mask);
+                if (layers.size === 0 && invLayers.size === 0) {
+                    continue bSetLoop;
+                }
+                for (const rectA of setA.rects) {
+                    const {topLeft: tlA, bottomRight: brA} = GeometryModule.OriginRect.toCorner(rectA);
+                    bRectLoop: for (const rectB of setB.rects) {
+                        const {topLeft: tlB, bottomRight: brB} = GeometryModule.OriginRect.toCorner(rectB);
+                        const topLeft = createVec2({x: tlB.x + bPos.x - brA.x - aPos.x, y: tlB.y + bPos.y - brA.y - aPos.y});
+                        const bottomRight = createVec2({x: brB.x + bPos.x - tlA.x - aPos.x, y: brB.y + bPos.y - tlA.y - aPos.y});
+                        const sweep = sweptAABB({topLeft: topLeft, bottomRight: bottomRight}, relVel, initialTime);
+                        if (sweep === undefined) {
+                            continue bRectLoop;
+                        }
+                        if (firstSweep === undefined || sweep.time < firstSweep.time) {
+                            firstSweep = sweep;
+                        }
+                    }
+                }
+                if (firstSweep !== undefined) {
+                    // There was a collision
+                    const collision = {
+                        self: setA,
+                        trigger: setB,
+                        layers: layers,
+                        invLayers: invLayers,
+                        isValid: true,
+                        normal: firstSweep.normal,
+                        time: firstSweep.time,
+                        isSolid: setA.isSolid && setB.isSolid,
+                    } satisfies CollisionEvent;
+                    collisions.push(collision);
+                }
+            }
+        }
+        return collisions;
+    }
+
+    static readonly EPSILON = 5e-2; // Design question. Experimental?
+    static resolveCollisionFor(entity: CollisionEntity, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
+        if (hasVelocity(entity)) {
+            const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime;
+            const vel = entity.components.velocity;
+            entity.components.origin.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
+            entity.components.origin.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
+            switch (collision.normal) {
+                case Normal.LEFT:
+                    vel.x = Math.min(vel.x, 0);
+                    break;
+                case Normal.RIGHT:
+                    vel.x = Math.max(vel.x, 0);
+                    break;
+                case Normal.TOP:
+                    vel.y = Math.min(vel.y, 0);
+                    break;
+                case Normal.BOTTOM:
+                    vel.y = Math.max(vel.y, 0);
+                    break;
+            }
+        }
+    }
+
+    static recalculatePositions(uuid: number, candidateMap: Map<number, number[]>, localTime: Map<number, number>, deltaTime: number) {
+        const partners = candidateMap.get(uuid) ?? [];
+        const accum: CollisionEvent[] = [];
+        partners.forEach(partner => {
+            accum.push(...PhysicsSystem.collisionsFromPair([uuid, partner], localTime, deltaTime));
+        });
+        return accum;
+    }
+
+    checkCollisions(game: Game) {
+        resetCollisionState(this.collisionState);
+
+        // Update bounding boxes
+        for (const colliderId of this.colliderIds) {
+            const entity = UuidPool.get(colliderId);
+            if (entity === undefined || !hasCollision(entity) || !entity.isAlive) {
+                continue;
+            }
+            this.collisionState.localTime.set(entity.uuid, 0);
+            CollisionModule.updateCollisions(this, entity);
+        }
+
+        insertionSort(this.edgesX, sapEdgeCmp);
+        insertionSort(this.edgesY, sapEdgeCmp);
+
+        // Sweep and prune
+        // X
+        const xPairs = PhysicsSystem.sweepAndPrune(this.edgesX);
+        // Y
+        const yPairs = PhysicsSystem.sweepAndPrune(this.edgesY);
+        const deltaTime = game.deltaTime;
+        for (const pair of xPairs) {
+            if (yPairs.has(pair)) {
+                PhysicsSystem.writeCandidatesMap(pair, this.collisionState.candidatesMap);
+                const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
+                for (const collision of collisions) {
+                    this.collisionState.priorityQueue.insert(collision);
+                    pair.forEach((id) => {
+                        if (!this.collisionState.involvedEvents.has(id)) {
+                            this.collisionState.involvedEvents.set(id, []);
+                        }
+                        this.collisionState.involvedEvents.get(id)!.push(collision);
+                    });
+                }
+            }
+        }
+
+        for (const nextCollision of this.collisionState.priorityQueue) {
+            if (!nextCollision.isValid) {
+                continue;
+            }
+            const inverse = CollisionModule.invert(nextCollision);
+            // Ignore static solid collisions
+            // Messy, probably buggy, but I dunno how to deal with that
+            if (nextCollision.isSolid && nextCollision.normal !== Normal.PREVIOUS) {
+                // Resolve solid collisions
+                const selfEnt = UuidPool.get(nextCollision.self.entityId)! as CollisionEntity;
+                const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as CollisionEntity;
+
+                PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime);
+                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime);
+                
+                this.collisionState.localTime.set(selfEnt.uuid, nextCollision.time);
+                this.collisionState.localTime.set(triggerEnt.uuid, nextCollision.time);
+
+                // Invalidate all remaining collisions of both entities
+                const selfEvents = this.collisionState.involvedEvents.get(nextCollision.self.entityId)!;
+                for (const collision of selfEvents.values()) {
+                    collision.isValid = false;
+                }
+                const triggerEvents = this.collisionState.involvedEvents.get(nextCollision.trigger.entityId)!;
+                for (const collision of triggerEvents.values()) {
+                    collision.isValid = false;
+                }
+                selfEvents.length = 0;
+                triggerEvents.length = 0;
+
+                // Recalculate collisions involving either entity and add back to priority queue
+                //const pair: [number, number] = [nextCollision.self.entityId, nextCollision.trigger.entityId];
+                //const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
+                const collisions: CollisionEvent[] = [
+                    ...PhysicsSystem.recalculatePositions(nextCollision.self.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime),
+                    ...PhysicsSystem.recalculatePositions(nextCollision.trigger.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime)
+                ];
+                for (const collision of collisions) {
+                    this.collisionState.priorityQueue.insert(collision);
+                    [collision.self.entityId, collision.trigger.entityId].forEach((id) => {
+                        if (!this.collisionState.involvedEvents.has(id)) {
+                            this.collisionState.involvedEvents.set(id, []);
+                        }
+                        this.collisionState.involvedEvents.get(id)!.push(collision);
+                    });
+                    selfEvents.push(collision);
+                    triggerEvents.push(collision);
+                }
+            }
+            // Check if this pair of box sets already has a trigger registered
+            const key: [number, number] = [nextCollision.self.uuid, nextCollision.trigger.uuid];
+
+            if (!this.collisionState.firedTriggers.has(key)) {
+                // If not, register it
+                this.collisionState.firedTriggers.add(key);
+                this.collisionState.eventQueue.push(nextCollision, inverse);
+            }
+        }
+
+        // Fire all registered collision events
+        for (const collision of this.collisionState.eventQueue) {
+            if (collision.layers.size > 0) collision.self.onCollide?.(collision);
+        }
+
+        // Resolve remaining velocities
+        for (const colliderId of this.colliderIds) {
+            const entity = UuidPool.get(colliderId) as CollisionEntity;
+            if (!hasVelocity(entity)) {
+                continue;
+            }
+            const localTime = this.collisionState.localTime.get(colliderId) ?? 0;
+            if (localTime >= 1) {
+                continue;
+            }
+            const origin = entity.components.origin;
+            const velocity = entity.components.velocity;
+            const ellapsed = (1 - localTime) * deltaTime;
+            origin.origin.x += velocity.x * ellapsed;
+            origin.origin.y += velocity.y * ellapsed;
+        }
+    }
+
+    // Putting this here because it reuses collision logic
+    fireInputEvents(game: Game, eventType: TouchType, position: OriginRect) {
+        resetTouchState(this.touchState);
+
+        position.origin = game.renderSystem.screenToWorld(position.origin);
+
+        this.edgesX.sort(sapEdgeCmp);
+        this.edgesY.sort(sapEdgeCmp);
+
+        const corners = GeometryModule.OriginRect.toCorner(position);
+
+        const xIds = PhysicsSystem.sweepOne(this.edgesX, corners.topLeft.x, corners.bottomRight.x);
+        const yIds = PhysicsSystem.sweepOne(this.edgesY, corners.topLeft.y, corners.bottomRight.y);
+
+        for (const id of xIds) {
+            if (!yIds.has(id)) {
+                continue;
+            }
+            const entity = UuidPool.get(id);
+            if (entity === undefined || !hasCollision(entity)) {
+                continue;
+            }
+            let basePos = entity.components.origin.origin;
+            if (!entity.components.origin.inWorld) {
+                basePos = game.renderSystem.screenToWorld(basePos);
+            }
+            setLoop: for (const set of entity.components.collision.collisionSets) {
+                if (!set.touchMask?.has(eventType) || set.onTouch === undefined) {
+                    continue setLoop;
+                }
+                rectLoop: for (const oRect of set.rects) {
+                    const topLeft = createVec2({
+                        x: oRect.origin.x - oRect.size.x / 2 + basePos.x,
+                        y: oRect.origin.y - oRect.size.y / 2 + basePos.y,
+                    });
+                    const bottomRight = createVec2({
+                        x: oRect.origin.x + oRect.size.x / 2 + basePos.x,
+                        y: oRect.origin.y + oRect.size.y / 2 + basePos.y,
+                    });
+                    const cRect = createCornerRect({topLeft, bottomRight});
+                    const overlap = GeometryModule.CornerRect.overlap(cRect, corners);
+                    if (overlap === undefined) {
+                        continue rectLoop;
+                    }
+                    const event: TouchEvent = createTouchEvent({
+                        self: set,
+                        event: eventType,
+                        priority: set.touchPriority ?? 0,
+                    });
+                    this.touchState.queue.insert(event);
+                }
+            }
+        }
+
+        for (const event of this.touchState.queue) {
+            if (event.self.onTouch?.(event)) {
+                break;
+            }
+        }
+    }
+
+};
