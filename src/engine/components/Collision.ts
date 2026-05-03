@@ -203,10 +203,10 @@ export const CollisionModule = {
         let [maxX, maxY] = [bottomRight.x, bottomRight.y];
         if (hasVelocity(data)) {
             const vel = data.components.velocity;
-            minX = Math.min(minX, minX + vel.x);
-            maxX = Math.max(maxX, maxX + vel.x);
-            minY = Math.min(minY, minY + vel.y);
-            maxY = Math.max(maxY, maxY + vel.y);
+            minX = Math.min(minX, minX + vel.x * data.game.deltaTime);
+            maxX = Math.max(maxX, maxX + vel.x * data.game.deltaTime);
+            minY = Math.min(minY, minY + vel.y * data.game.deltaTime);
+            maxY = Math.max(maxY, maxY + vel.y * data.game.deltaTime);
         }
         handle.left.pos = minX;
         handle.right.pos = maxX;

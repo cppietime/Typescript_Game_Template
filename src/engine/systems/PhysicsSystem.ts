@@ -252,13 +252,19 @@ export class PhysicsSystem implements EntitySystem {
         return collisions;
     }
 
-    static readonly EPSILON = 5e-2; // Design question. Experimental?
-    static resolveCollisionFor(entity: CollisionEntity, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number) {
+    static moveIfFree(entity: CollisionEntity, newPos: Vec2, localTime: Map<number, number>, deltaTime: number, candidates: Map<number, number[]>) {
+        // This is absolutely bugged and I can't figure out the fix
+        entity.components.origin.origin = newPos;
+    }
+
+    static readonly EPSILON = 0; // Design question. Experimental?
+    static resolveCollisionFor(entity: CollisionEntity, collision: CollisionEvent, localTime: Map<number, number>, deltaTime: number, candidates: Map<number, number[]>) {
         if (hasVelocity(entity)) {
-            const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime;
+            const ellapsed = (collision.time - (localTime.get(entity.uuid) ?? 0)) * deltaTime * (1 - PhysicsSystem.EPSILON);
             const vel = entity.components.velocity;
-            entity.components.origin.origin.x += ellapsed * vel.x * (1 - PhysicsSystem.EPSILON);
-            entity.components.origin.origin.y += ellapsed * vel.y * (1 - PhysicsSystem.EPSILON);
+            const oldOrigin = entity.components.origin.origin;
+            const newOrigin = createVec2({x: oldOrigin.x + ellapsed * vel.x, y: oldOrigin.y + ellapsed * vel.y});
+            PhysicsSystem.moveIfFree(entity, newOrigin, localTime, deltaTime, candidates);
             switch (collision.normal) {
                 case Normal.LEFT:
                     vel.x = Math.min(vel.x, 0);
@@ -335,8 +341,8 @@ export class PhysicsSystem implements EntitySystem {
                 const selfEnt = UuidPool.get(nextCollision.self.entityId)! as CollisionEntity;
                 const triggerEnt = UuidPool.get(nextCollision.trigger.entityId)! as CollisionEntity;
 
-                PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime);
-                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime);
+                PhysicsSystem.resolveCollisionFor(selfEnt, nextCollision, this.collisionState.localTime, deltaTime, this.collisionState.candidatesMap);
+                PhysicsSystem.resolveCollisionFor(triggerEnt, inverse, this.collisionState.localTime, deltaTime, this.collisionState.candidatesMap);
                 
                 this.collisionState.localTime.set(selfEnt.uuid, nextCollision.time);
                 this.collisionState.localTime.set(triggerEnt.uuid, nextCollision.time);
@@ -354,12 +360,13 @@ export class PhysicsSystem implements EntitySystem {
                 triggerEvents.length = 0;
 
                 // Recalculate collisions involving either entity and add back to priority queue
-                //const pair: [number, number] = [nextCollision.self.entityId, nextCollision.trigger.entityId];
-                //const collisions = PhysicsSystem.collisionsFromPair(pair, this.collisionState.localTime, deltaTime);
-                const collisions: CollisionEvent[] = [
-                    ...PhysicsSystem.recalculatePositions(nextCollision.self.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime),
-                    ...PhysicsSystem.recalculatePositions(nextCollision.trigger.entityId, this.collisionState.candidatesMap, this.collisionState.localTime, deltaTime)
-                ];
+                const newPairs = CustomSet.pairSet<number>();
+                this.collisionState.candidatesMap.get(nextCollision.self.entityId)?.forEach(n => newPairs.add([nextCollision.self.entityId, n]));
+                this.collisionState.candidatesMap.get(nextCollision.trigger.entityId)?.forEach(n => newPairs.add([nextCollision.trigger.entityId, n]));
+                const collisions: CollisionEvent[] = [];
+                for (const newPair of newPairs) {
+                    collisions.push(...PhysicsSystem.collisionsFromPair(newPair, this.collisionState.localTime, deltaTime));
+                }
                 for (const collision of collisions) {
                     this.collisionState.priorityQueue.insert(collision);
                     [collision.self.entityId, collision.trigger.entityId].forEach((id) => {
@@ -399,9 +406,12 @@ export class PhysicsSystem implements EntitySystem {
             }
             const origin = entity.components.origin;
             const velocity = entity.components.velocity;
-            const ellapsed = (1 - localTime) * deltaTime;
-            origin.origin.x += velocity.x * ellapsed;
-            origin.origin.y += velocity.y * ellapsed;
+            const ellapsed = (1 - localTime) * deltaTime * (1 - PhysicsSystem.EPSILON);
+            const newOrigin = createVec2({
+                x: origin.origin.x + velocity.x * ellapsed,
+                y: origin.origin.y + velocity.y * ellapsed,
+            });
+            PhysicsSystem.moveIfFree(entity, newOrigin, this.collisionState.localTime, deltaTime, this.collisionState.candidatesMap);
         }
     }
 

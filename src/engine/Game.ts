@@ -60,6 +60,9 @@ export class Game {
     lastTime = 0;
     deltaTime = 0;
 
+    preUpdate?: () => void;
+    postUpdate?: () => void;
+
     constructor() {
         this.canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
 
@@ -216,7 +219,9 @@ export class Game {
     }
 
     private gameLoop() {
+        this.preUpdate?.();
         this.update();
+        this.postUpdate?.();
         this.flushCommands();
         this.render();
 
@@ -228,16 +233,9 @@ export class Game {
         this.inputSystem.onInterrupt();
     }
 
-    frames = 0;
-    runTime = 0;
     private update() {
         this.deltaTime = Date.now() / 1000 - this.lastTime;
         this.lastTime += this.deltaTime;
-        this.frames++;
-        this.runTime += this.deltaTime;
-        if (this.frames % 100 === 0) {
-            //console.log(this.frames / this.runTime, 'FPS');
-        }
         if (this.paused) {
             return;
         }

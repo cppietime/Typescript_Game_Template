@@ -93,7 +93,7 @@ export type SweepResult = {
  * @param rect AABB transformed relative to origin
  * @param velocity Relative velocity of origin point to `rect`
  * @param startTime Starting time before beginning collision check
- * @returns If no collision, undefined. Otherwise, the time of collision and normal direction first collided.
+ * @returns If no collision, undefined. Otherwise, the time of collision and normal direction first collided. Time is a multiple of the frame.
  */
 export function sweptAABB(rect: CornerRect, velocity: Vec2, startTime: number): SweepResult | undefined {
     let tMin: number, tMax: number, normal: Normal;

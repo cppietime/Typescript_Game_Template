@@ -88,19 +88,33 @@ function setupGame(game: Game) {
         }
     });
 
-    const prop = DecorModule.createDecor(game);
-    prop.components.origin = createOriginComponent({origin: createVec2({x: 400.5, y: 144})});
-    prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag(createCollisionSet({
-        entityId: prop.uuid,
-        isSolid: true,
-        layers: new Set([1]),
-        mask: new Set([1]),
-        rects: [
-            createOriginRect({size: createVec2({x: 64, y: 64})})
-        ],
-        onCollide: () => {}
-    })));
-    game.createEntity(prop);
+    const makeFollower = () => {
+        const prop = DecorModule.createDecor(game);
+        prop.components.origin = createOriginComponent({origin: createVec2({x: -20, y: -144})});
+        prop.components.collision.collisionSets.push(CollisionModule.collisionSetMap.addAndTag(createCollisionSet({
+            entityId: prop.uuid,
+            isSolid: true,
+            layers: new Set([1]),
+            mask: new Set([1]),
+            rects: [
+                createOriginRect({size: createVec2({x: 64, y: 64})})
+            ],
+            onCollide: () => {}
+        })));
+        prop.components.tick = () => {
+            const propPos = prop.components.origin.origin;
+            const playerPos = player.components.origin.origin;
+            const diff = createVec2({x: playerPos.x - propPos.x, y: playerPos.y - propPos.y});
+            const mag = Math.hypot(diff.x, diff.y);
+            prop.components.velocity = createVec2({x: diff.x / mag * 150, y: diff.y / mag * 150});
+        };
+        return prop;
+    };
+    const prop1 = makeFollower();
+    game.createEntity(prop1);
+    const prop2 = makeFollower();
+    prop2.components.origin.origin = createVec2({x: -20, y: -40});
+    game.createEntity(prop2);
 
     const trigger = DecorModule.createDecor(game);
     trigger.components.origin = createOriginComponent({origin: createVec2({x: 220, y: 544})});
@@ -116,7 +130,7 @@ function setupGame(game: Game) {
             if (r !== undefined) r.visible = false;
         }
     })));
-    game.createEntity(trigger);
+    //game.createEntity(trigger);
     console.log('Trigger id', trigger.uuid);
 
     const triggered = DecorModule.createDecor(game);
@@ -128,7 +142,7 @@ function setupGame(game: Game) {
             createOriginRect({size: createVec2({x: 64, y: 64})})
         ],
     })));
-    game.createEntity(triggered);
+    //game.createEntity(triggered);
 
     const bg = ScrollModule.create(game, {
         image: 'background',

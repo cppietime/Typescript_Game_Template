@@ -9,7 +9,7 @@ import type { Entity } from "../entity/Entity.js";
 
 export class RenderSystem implements EntitySystem {
     private readonly canvas: HTMLCanvasElement;
-    private readonly ctx: CanvasRenderingContext2D;
+    readonly ctx: CanvasRenderingContext2D;
     private readonly spriteSystem = new ImageSystem();
     private readonly zSorted: RenderEntity[] = [];
     private readonly uuidToIdx = new Map<number, number>();
@@ -97,12 +97,15 @@ export class RenderSystem implements EntitySystem {
 
         this.ctx.imageSmoothingEnabled = false;
 
-        this.clear('#008800');
+        this.fillRect('#008800');
     }
 
-    clear(style: string = '#000000') {
+    fillRect(style: string = '#000000', x: number = 0, y: number = 0, w: number = this.canvas.width, h: number = this.canvas.height, relative: boolean = false) {
         this.ctx.fillStyle = style;
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        if (relative) {
+            ({x, y} = this.worldToScreen(createVec2({x, y})));
+        }
+        this.ctx.fillRect(x, y, w, h);
     }
 
     drawOutline(rect: TlRect, color: string, relative: boolean = false) {
@@ -160,7 +163,7 @@ export class RenderSystem implements EntitySystem {
     render() {
         this.clean();
 
-        this.clear(this.clearColor);
+        this.fillRect(this.clearColor);
 
         for (const renderable of this.zSorted) {
             if (!renderable.components.renderable.visible) {
