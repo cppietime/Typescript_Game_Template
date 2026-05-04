@@ -7,7 +7,7 @@ import { CollisionModule, createCollisionSet, type CollisionEntity, type Collisi
 import { createOriginComponent, type SizeEntity, type VelocityEntity } from "../../engine/components/Physical.js";
 import type { TickComponent, TickEntity } from "../../engine/components/Tick.js";
 import { RenderModule, type RenderEntity } from "../../engine/components/RenderComponent.js";
-import type { Entity } from "../../engine/entity/Entity.js";
+import { entityHas, type Entity } from "../../engine/entity/Entity.js";
 import { UNASSIGNED, UuidPool, type CleanupFn } from "../../engine/entity/Uuid.js";
 import {TouchType} from "../../engine/data/types/Inputs.js";
 import { createFactory } from "../../engine/util/Typing.js";
@@ -29,6 +29,7 @@ const createPlayerComponent = createFactory<PlayerComponent, "pulse" | "starting
 });
 
 export type PlayerEntity = RenderEntity & TickEntity & VelocityEntity & CollisionEntity & SizeEntity & Entity<WithPlayerComponent>;
+export const hasPlayer = (entity: Entity<any>): entity is PlayerEntity => entityHas(entity, ["player"]);
 
 const sprite: Sprite = {
     image: 'sprite_atlas',
@@ -147,10 +148,20 @@ export const PlayerModule = {
             ctx.restore();
         };
         const projectile = ProjectileModule.create(
-            game, RenderModule.fromCallback(pRender),
+            game,
+            RenderModule.fromCallback(pRender),
             {origin: {...data.components.origin.origin}, inWorld: true},
             () => console.log('PROJECTILE'),
-            undefined,
+            {collisionSets: [
+                {
+                    rects: [createOriginRect({origin: createVec2({}), size: createVec2({x: 32, y: 32})})],
+                    uuid: UNASSIGNED,
+                    entityId: UNASSIGNED,
+                    layers: new Set([2]),
+                    mask: new Set(),
+                    isSolid: false,
+                }
+            ]},
             {...data.components.velocity},
             createVec2({x: 32, y: 32}),
             1

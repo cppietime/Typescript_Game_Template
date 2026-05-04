@@ -7,6 +7,8 @@ import { DecorModule } from "./entities/template/Decor.js";
 import { ScrollModule } from "./entities/template/Scroll.js";
 import { JoystickModule } from "./entities/ui/Joystick.js";
 import { State, Trigger } from "./data/Inputs.js";
+import { EnemyModule } from "./entities/template/Enemy.js";
+import { RenderModule } from "../engine/components/RenderComponent.js";
 
 const main = (): void => {
     console.log('Main');
@@ -153,6 +155,27 @@ function setupGame(game: Game) {
         color: '#ff0',
     });
     game.createEntity(bg);
+
+    const enemy = EnemyModule.create(
+        game,
+        {collisionSets: [
+            EnemyModule.createHitBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})], 1),
+            EnemyModule.createHurtBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})], 2),
+        ]},
+        createVec2({x: 64, y: 64}),
+        RenderModule.staticSpriteRenderer({
+            image: 'sprite_atlas',
+            source: createTlRect({topLeft: createVec2({x: 48, y: 0}), size: createVec2({x: 16, y: 16})}),
+            color: '#f00',
+        }),
+        {
+            attack: 1,
+            health: 100,
+            speed: 100,
+        },
+    );
+    enemy.components.origin.origin = createVec2({x: 100, y: 200});
+    game.createEntity(enemy);
 }
 
 function startGame(game: Game) {
