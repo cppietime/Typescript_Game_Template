@@ -9,6 +9,7 @@ import { JoystickModule } from "./entities/ui/Joystick.js";
 import { State, Trigger } from "./data/Inputs.js";
 import { EnemyModule } from "./entities/template/Enemy.js";
 import { RenderModule } from "../engine/components/RenderComponent.js";
+import type { Animation } from "../engine/data/types/Sprites.js";
 
 const main = (): void => {
     console.log('Main');
@@ -156,6 +157,58 @@ function setupGame(game: Game) {
     });
     game.createEntity(bg);
 
+    const enemyAnim: Animation = {
+        frames: [
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 0, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 16, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 32, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 48, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 32, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+            {
+                time: 0.25,
+                sprite: {
+                    image: 'sprite_atlas',
+                    source: createTlRect({topLeft: createVec2({x: 16, y: 16}), size: createVec2({x: 16, y: 16})}),
+                    color: '#f00',
+                }
+            },
+        ],
+    };
     const enemy = EnemyModule.create(
         game,
         {collisionSets: [
@@ -163,11 +216,7 @@ function setupGame(game: Game) {
             EnemyModule.createHurtBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})], 2),
         ]},
         createVec2({x: 64, y: 64}),
-        RenderModule.staticSpriteRenderer({
-            image: 'sprite_atlas',
-            source: createTlRect({topLeft: createVec2({x: 48, y: 0}), size: createVec2({x: 16, y: 16})}),
-            color: '#f00',
-        }),
+        RenderModule.animationRenderer(enemyAnim),
         {
             attack: 1,
             health: 100,

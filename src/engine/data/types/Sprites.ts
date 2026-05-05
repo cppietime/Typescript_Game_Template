@@ -10,3 +10,12 @@ export type ImageSpec = {
     name: string;
     url: string;
 };
+
+export type KeyFrame = {
+    sprite: Sprite,
+    time: number,
+};
+
+export type Animation = {
+    frames: KeyFrame[],
+};

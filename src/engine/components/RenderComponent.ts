@@ -1,5 +1,5 @@
 import type { RenderSystem } from "../systems/RenderSystem.js";
-import type { Sprite } from "../data/types/Sprites.js";
+import type { Animation, Sprite } from "../data/types/Sprites.js";
 import { GeometryModule } from "../util/Geometry.js";
 import { entityHas, type Entity, type With } from "../entity/Entity.js";
 import {hasSize, type OriginEntity} from "./Physical.js";
@@ -45,5 +45,27 @@ export const RenderModule = {
                 renderers.forEach(renderer => renderer.render(renderSystem, data));
             });
     },
+
+    animationRenderer: (animation: Animation): RenderComponent => {
+        let time = 0;
+        let idx = 0;
+        return RenderModule.fromCallback((renderSystem: RenderSystem, data: RenderEntity & OriginEntity) => {
+            time += data.game.deltaTime;
+            while (time > animation.frames[idx]!.time) {
+                time -= animation.frames[idx]!.time;
+                idx = (idx + 1) % animation.frames.length;
+            }
+            const keyFrame = animation.frames[idx]!;
+            const sprite = keyFrame.sprite;
+            let w: number, h: number;
+            if (hasSize(data)) {
+                ({x: w, y: h} = data.components.size);
+            } else {
+                ({x: w, y: h} = sprite.source.size);
+            }
+            const rect = GeometryModule.OriginRect.toTl({origin: data.components.origin.origin, size: {x: w, y: h}});
+            renderSystem.drawSprite(sprite, rect.topLeft.x, rect.topLeft.y, rect.size.x, rect.size.y, data.components.origin.inWorld);
+        });
+    }
 
 };
