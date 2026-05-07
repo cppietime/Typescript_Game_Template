@@ -1,7 +1,7 @@
 import { State, Trigger } from "../../game/data/Inputs.js";
 import {TouchType} from "../../engine/data/types/Inputs.js";
 import type { Game } from "../Game.js";
-import { createOriginRect, createVec2 } from "../util/Geometry.js";
+import { createOriginRect, createVec2, type Vec2 } from "../util/Geometry.js";
 import { IdMap } from "../util/IdMap.js";
 
 export type InputRegion = {
@@ -11,8 +11,7 @@ export type InputRegion = {
 export type TouchListener = (click: ClickState) => void;
 
 export type ClickState = {
-    x: number,
-    y: number,
+    position: Vec2,
     down: boolean,
     initial: boolean,
 };
@@ -21,7 +20,7 @@ export class InputSystem {
     private readonly game: Game;
     private readonly triggerMapping: Map<Trigger, (() => void)[]> = new Map();
     private readonly activeStates: Set<State> = new Set();
-    private readonly currentClick: ClickState = {x: 0, y: 0, down: false, initial: false};
+    private readonly currentClick: ClickState = {position: createVec2({}), down: false, initial: false};
     private readonly regionStates: Set<State> = new Set();
     
     inputRegions: IdMap<InputRegion> = new IdMap();
@@ -65,54 +64,93 @@ export class InputSystem {
         this.regionStates.add(state);
     }
 
+    private touchStart(pos: Vec2) {
+        this.setClickPos(pos);
+        this.currentClick.down = true;
+        this.currentClick.initial = true;
+        this.updateRegionStates();
+        for (const listener of this.touchListeners.values()) {
+            listener(this.currentClick);
+        }
+        this.game.physicsSystem.fireInputEvents(this.game, TouchType.BEGIN, createOriginRect({
+            origin: this.game.renderSystem.positionOnCanvas(pos),
+            size: createVec2({}),
+        }));
+    }
+
+    private touchEnd(pos: Vec2) {
+        this.currentClick.down = false;
+        this.currentClick.initial = false;
+        this.updateRegionStates();
+        this.game.physicsSystem.fireInputEvents(this.game, TouchType.END, createOriginRect({
+            origin: this.game.renderSystem.positionOnCanvas(pos),
+            size: createVec2({}),
+        }));
+    }
+
+    private touchMove(pos: Vec2) {
+        this.setClickPos(pos);
+        this.currentClick.initial = false;
+        this.updateRegionStates();
+        this.game.physicsSystem.fireInputEvents(this.game, TouchType.MOVE, createOriginRect({
+            origin: this.game.renderSystem.positionOnCanvas(pos),
+            size: createVec2({}),
+        }));
+    }
+
+    private touchToOffset(pos: Vec2): Vec2 {
+        const rect = this.game.canvas.getBoundingClientRect();
+        const l = rect.left;
+        const t = rect.top;
+        return createVec2({x: pos.x - l, y: pos.y - t});
+    }
+
     setupInputs() {
             // Mouse/touch inputs
             this.game.canvas.addEventListener('mousedown', (ev: MouseEvent) => {
-                this.setClickPos(ev.offsetX, ev.offsetY);
-                this.currentClick.down = true;
-                this.currentClick.initial = true;
-                this.updateRegionStates();
-                for (const listener of this.touchListeners.values()) {
-                    listener(this.currentClick);
+                this.touchStart(createVec2({x: ev.offsetX, y: ev.offsetY}))
+            });
+            this.game.canvas.addEventListener('touchstart', (ev: TouchEvent) => {
+                const touch = ev.changedTouches[0];
+                if (touch === undefined) {
+                    return;
                 }
-                this.game.physicsSystem.fireInputEvents(this.game, TouchType.BEGIN, createOriginRect({
-                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
-                    size: createVec2({}),
-                }));
+                this.touchStart(this.touchToOffset(createVec2({x: touch.clientX, y: touch.clientY})));
             });
             this.game.canvas.addEventListener('mouseup', (ev: MouseEvent) => {
-                this.currentClick.down = false;
-                this.currentClick.initial = false;
-                this.updateRegionStates();
-                this.game.physicsSystem.fireInputEvents(this.game, TouchType.END, createOriginRect({
-                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
-                    size: createVec2({}),
-                }));
+                this.touchEnd(createVec2({x: ev.offsetX, y: ev.offsetY}));
+            });
+            this.game.canvas.addEventListener('touchend', (ev: TouchEvent) => {
+                const touch = ev.changedTouches[0];
+                if (touch === undefined) {
+                    return;
+                }
+                this.touchEnd(this.touchToOffset(createVec2({x: touch.clientX, y: touch.clientY})));
             });
             this.game.canvas.addEventListener('mousemove', (ev: MouseEvent) => {
-                this.setClickPos(ev.offsetX, ev.offsetY);
-                this.currentClick.initial = false;
-                this.updateRegionStates();
-                this.game.physicsSystem.fireInputEvents(this.game, TouchType.MOVE, createOriginRect({
-                    origin: this.game.renderSystem.positionOnCanvas(createVec2({x: ev.offsetX, y: ev.offsetY})),
-                    size: createVec2({}),
-                }));
+                this.touchMove(createVec2({x: ev.offsetX, y: ev.offsetY}));
+            });
+            this.game.canvas.addEventListener('touchmove', (ev: TouchEvent) => {
+                const touch = ev.changedTouches[0];
+                if (touch === undefined) {
+                    return;
+                }
+                this.touchMove(this.touchToOffset(createVec2({x: touch.clientX, y: touch.clientY})));
+                ev.preventDefault();
             });
     }
 
     fireTouchEvent() {
         if (this.currentClick.down) {
             this.game.physicsSystem.fireInputEvents(this.game, TouchType.TOUCHING, createOriginRect({
-                origin: createVec2({...this.currentClick}),
+                origin: this.currentClick.position,
                 size: createVec2({}),
             }));
         }
     }
 
-    setClickPos(screenX: number, screenY: number) {
-        const {x, y} = this.game.positionOnCanvas(screenX, screenY);
-        this.currentClick.x = x;
-        this.currentClick.y = y;
+    private setClickPos(pos: Vec2) {
+        this.currentClick.position = this.game.positionOnCanvas(pos);
     }
 
     updateRegionStates() {

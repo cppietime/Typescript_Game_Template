@@ -49,11 +49,18 @@ export class RenderSystem implements EntitySystem {
 
     removeEntity(uuid: number) {
         const idx = this.uuidToIdx.get(uuid);
-        this.uuidToIdx.delete(uuid);
         if (idx === undefined) {
             return;
         }
-        this.zSorted.splice(idx, 1);
+        this.uuidToIdx.delete(uuid);
+        const ent = this.zSorted[idx]!;
+        if (idx === this.zSorted.length - 1) {
+            this.zSorted.pop();
+        } else {
+            const oldTail = this.zSorted.pop()!;
+            this.zSorted[idx] = oldTail;
+            this.uuidToIdx.set(oldTail.uuid, idx);
+        }
         this.markDirty();
     }
 

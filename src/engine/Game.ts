@@ -13,6 +13,7 @@ import type { Vec2 } from './util/Geometry.js';
 import type { EntitySystem } from "./systems/EntitySystem.js";
 import type { Entity } from "./entity/Entity.js";
 import { UuidPool } from "./entity/Uuid.js";
+import { LifecycleSystem } from "./systems/LifecycleSystem.js";
 
 enum CommandType {
     CREATE,
@@ -49,10 +50,11 @@ export class Game {
     readonly uiSystem: UiSystem;
     readonly physicsSystem: PhysicsSystem;
     readonly updateSystem: UpdateSystem;
+    readonly lifecycleSystem: LifecycleSystem;
 
     private readonly entitySystems: EntitySystem[] = [];
 
-    private readonly commandQueue: Command[] = [];
+    private commandQueue: Command[] = [];
     private dirtyEntities = new Set<number>();
 
     paused = false;
@@ -71,11 +73,13 @@ export class Game {
         this.uiSystem = new UiSystem(this);
         this.physicsSystem = new PhysicsSystem();
         this.updateSystem = new UpdateSystem();
+        this.lifecycleSystem = new LifecycleSystem();
 
         this.entitySystems.push(
             this.updateSystem,
             this.physicsSystem,
             this.renderSystem,
+            this.lifecycleSystem,
         );
 
         this.lastTime = Date.now() / 1000;
@@ -181,10 +185,13 @@ export class Game {
 
     private flushCommands() {
         this.dirtyEntities.clear();
-        for (const command of this.commandQueue) {
-            this.runCommand(command);
+        while (this.commandQueue.length != 0) {
+            const oldQueue = this.commandQueue;
+            this.commandQueue = [];
+            for (const command of oldQueue) {
+                this.runCommand(command);
+            }
         }
-        this.commandQueue.length = 0;
         this.dirtyEntities.forEach((entity) => this.syncEntity(entity));
     }
 
@@ -194,6 +201,7 @@ export class Game {
                 {
                     const entity = command.entity;
                     UuidPool.assignUuid(entity);
+                    console.log('Assigned', entity.uuid);
                     this.dirtyEntities.add(entity.uuid);
                     break;
                 }
@@ -249,7 +257,7 @@ export class Game {
         this.renderSystem.render();
     }
 
-    positionOnCanvas(x: number, y: number): Vec2 {
-        return this.renderSystem.positionOnCanvas({x, y});
+    positionOnCanvas(pos: Vec2): Vec2 {
+        return this.renderSystem.positionOnCanvas(pos);
     }
 }

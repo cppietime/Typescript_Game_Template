@@ -7,9 +7,12 @@ import { DecorModule } from "./entities/template/Decor.js";
 import { ScrollModule } from "./entities/template/Scroll.js";
 import { JoystickModule } from "./entities/ui/Joystick.js";
 import { State, Trigger } from "./data/Inputs.js";
-import { EnemyModule } from "./entities/template/Enemy.js";
+import { EnemyEntity, EnemyModule } from "./entities/template/Enemy.js";
 import { RenderModule } from "../engine/components/RenderComponent.js";
 import type { Animation } from "../engine/data/types/Sprites.js";
+import { appendComponent } from "../engine/entity/Entity.js";
+import { LifecycleComponent, LifecycleEntity } from "../engine/components/LifecycleComponent.js";
+import { UNASSIGNED } from "../engine/entity/Uuid.js";
 
 const main = (): void => {
     console.log('Main');
@@ -74,7 +77,7 @@ function setupGame(game: Game) {
     const player = PlayerModule.create(game);
     game.createEntity(player);
 
-    const joystick = JoystickModule.createDpad8(game);
+    const joystick = JoystickModule.createDpad8(game, createVec2({x: 125, y: 125}), 75);
     game.createEntity(joystick);
 
     game.renderSystem.clearColor = '#0088ff';
@@ -86,7 +89,7 @@ function setupGame(game: Game) {
     game.inputSystem.touchListeners.add(clickState => {
         if (!(clickState.down && clickState.initial))
             return;
-        if (GeometryModule.rectContains(centerSquare, clickState)) {
+        if (GeometryModule.rectContains(centerSquare, clickState.position)) {
             console.log('Center click');
         }
     });
@@ -209,11 +212,11 @@ function setupGame(game: Game) {
             },
         ],
     };
-    const enemy = EnemyModule.create(
+    const enemy: EnemyEntity & LifecycleEntity = appendComponent(EnemyModule.create(
         game,
         {collisionSets: [
-            EnemyModule.createHitBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})], 1),
-            EnemyModule.createHurtBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})], 2),
+            EnemyModule.createHitBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})]),
+            EnemyModule.createHurtBox([createOriginRect({origin: createVec2({}), size: createVec2({x: 64, y: 64})})]),
         ]},
         createVec2({x: 64, y: 64}),
         RenderModule.animationRenderer(enemyAnim),
@@ -222,7 +225,33 @@ function setupGame(game: Game) {
             health: 100,
             speed: 100,
         },
-    );
+    ), {
+        lifecycle: {
+            onCreate: () => {
+                console.log('Create enemy!')
+            },
+            onDestroy: (data: LifecycleEntity) => {
+                const enemy = data as EnemyEntity & LifecycleEntity;
+                const newEnemy: EnemyEntity & LifecycleEntity = {
+                    ...enemy,
+                    uuid: UNASSIGNED,
+                    isAlive: true,
+                    components: {
+                        ...enemy.components,
+                        origin: createOriginComponent({
+                            origin: createVec2({x: 100, y: 100}),
+                        }),
+                        enemy: {
+                            ...enemy.components.enemy,
+                            health: 1,
+                        }
+                    },
+                };
+                data.game.createEntity(newEnemy);
+                console.log('Spawning new enemy!', data.uuid, newEnemy.uuid);
+            },
+        } satisfies LifecycleComponent,
+    });
     enemy.components.origin.origin = createVec2({x: 100, y: 200});
     game.createEntity(enemy);
 }

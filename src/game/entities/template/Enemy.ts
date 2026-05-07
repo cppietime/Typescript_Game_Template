@@ -6,6 +6,7 @@ import { type Entity, entityHas } from "../../../engine/entity/Entity.js";
 import { UNASSIGNED, UuidPool } from "../../../engine/entity/Uuid.js";
 import { Game } from "../../../engine/Game.js";
 import { createVec2, type OriginRect, type Vec2 } from "../../../engine/util/Geometry.js";
+import { LAYERS } from "../../data/Constants.js";
 import {hasPlayer, type PlayerEntity} from "../Player.js";
 
 export type EnemyComponent = {
@@ -42,26 +43,26 @@ export const EnemyModule = {
         return ent;
     },
 
-    createHitBox: (rects: OriginRect[], layer: number): CollisionSet => {
+    createHitBox: (rects: OriginRect[]): CollisionSet => {
         const set: CollisionSet = {
             isSolid: false,
             uuid: UNASSIGNED,
             entityId: UNASSIGNED,
-            layers: new Set<number>(),
-            mask: new Set([layer]),
+            layers: new Set<number>([]),
+            mask: new Set([LAYERS.PLAYER]),
             rects: rects,
             onCollide: EnemyModule.onHit,
         };
         return set;
     },
 
-    createHurtBox: (rects: OriginRect[], layer: number): CollisionSet => {
+    createHurtBox: (rects: OriginRect[]): CollisionSet => {
         const set: CollisionSet = {
             isSolid: false,
             uuid: UNASSIGNED,
             entityId: UNASSIGNED,
-            layers: new Set<number>(),
-            mask: new Set([layer]),
+            layers: new Set<number>([LAYERS.ENEMY]),
+            mask: new Set([LAYERS.PROJECTILE]),
             rects: rects,
             onCollide: EnemyModule.onHurt,
         };

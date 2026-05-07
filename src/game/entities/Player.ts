@@ -13,6 +13,7 @@ import {TouchType} from "../../engine/data/types/Inputs.js";
 import { createFactory } from "../../engine/util/Typing.js";
 import "./Projectile.js";
 import { ProjectileModule, type ProjectileEntity } from "./Projectile.js";
+import { LAYERS } from "../data/Constants.js";
 
 type PlayerComponent = {
     pulse: number,
@@ -68,8 +69,8 @@ export const PlayerModule = {
         collisionSets.push(CollisionModule.collisionSetMap.addAndTag(
             createCollisionSet({
                 isSolid: true,
-                layers: new Set([1]),
-                mask: new Set([0]),
+                layers: new Set([LAYERS.PLAYER]),
+                mask: new Set([LAYERS.SOLID]),
                 rects: [
                     createOriginRect({size: createVec2({x: 64, y: 64})}),
                 ],
@@ -151,15 +152,19 @@ export const PlayerModule = {
             game,
             RenderModule.fromCallback(pRender),
             {origin: {...data.components.origin.origin}, inWorld: true},
-            () => console.log('PROJECTILE'),
+            (game: Game, ent: TickEntity) => console.log('PROJECTILE', ent.uuid),
             {collisionSets: [
                 {
                     rects: [createOriginRect({origin: createVec2({}), size: createVec2({x: 32, y: 32})})],
                     uuid: UNASSIGNED,
                     entityId: UNASSIGNED,
-                    layers: new Set([2]),
-                    mask: new Set(),
+                    layers: new Set([LAYERS.PROJECTILE]),
+                    mask: new Set([LAYERS.ENEMY]),
                     isSolid: false,
+                    onCollide: (collision: CollisionEvent) => {
+                        const myId = collision.self.entityId;
+                        game.destroyEntity(myId);
+                    },
                 }
             ]},
             {...data.components.velocity},
