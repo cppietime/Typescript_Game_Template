@@ -64,7 +64,7 @@ export const JoystickModule = {
                             };
                             renderSystem.drawSprite(sprite, square.x - size / 2, square.y - size / 2, size, size)
                         }
-                    }),
+                    }, 1000),
                 origin: createOriginComponent({origin: originRect.origin, inWorld: false}),
                 collision: {
                     collisionSets: [
