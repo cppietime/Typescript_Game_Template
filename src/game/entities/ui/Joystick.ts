@@ -72,7 +72,6 @@ export const JoystickModule = {
                             rects: [sq.square],
                             touchMask: new Set([TouchType.TOUCHING]),
                             onTouch: (ev: TouchEvent) => {
-                                console.log(ev.self.rects[0]);
                                 game.inputSystem.queueRegion(sq.state);
                                 return false;
                             },
